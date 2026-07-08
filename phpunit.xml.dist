@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnWarning="true"
+         failOnRisky="true">
+    <testsuites>
+        <testsuite name="Test Suite">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_KEY" value="base64:2fl+Ktv0kdWtQ2QG/Y7g5+Q0Bx0iQ0kY8Yx0iQ0kY8="/>
+        <env name="WHATSAPP_CLOUD_APP_SECRET" value="test-app-secret"/>
+        <env name="WHATSAPP_CLOUD_VERIFY_TOKEN" value="test-verify-token"/>
+    </php>
+</phpunit>

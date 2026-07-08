@@ -1,0 +1,20 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - src/
+        - config/
+        - database/
+        - routes/
+
+    level: 6
+
+    checkModelProperties: true
+
+    ignoreErrors:
+        # env() in the package's own config file is fine; larastan can't tell a
+        # standalone package's config/ dir is "the config directory".
+        -
+            identifier: larastan.noEnvCallsOutsideOfConfig
+            path: config/whatsapp-cloud.php
