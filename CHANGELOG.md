@@ -2,7 +2,7 @@
 
 All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in this file.
 
-## [Unreleased]
+## [0.1.0] - 2026-07-08
 
 ### Added
 - Core sending over the Meta Cloud API: templates, session text and interactive lists (`CloudApiClient`).
