@@ -20,7 +20,7 @@ e eventos, e gestão de templates via Artisan.
 ## Requisitos
 
 - PHP `^8.3`
-- Laravel `^11.0 || ^12.0`
+- Laravel `^11.0 || ^12.0 || ^13.0`
 
 ## Instalação
 
