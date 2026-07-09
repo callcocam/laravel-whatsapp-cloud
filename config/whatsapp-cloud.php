@@ -67,6 +67,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Template management panel (Inertia + Vue)
+    |--------------------------------------------------------------------------
+    |
+    | A web page to create/list/edit/delete/send templates, powered by the same
+    | TemplateManager the CLI uses. It only registers when Inertia is installed
+    | (inertiajs/inertia-laravel) and `enabled` is true.
+    |
+    | The panel is powerful (it can create/delete/send). It defaults to the
+    | ['web', 'auth'] middleware — adjust it (e.g. add an authorization gate) to
+    | match your app. `ui_token`, when set, is an extra defense: every request
+    | must send the same value in the X-WA-UI-Token header.
+    |
+    */
+
+    'panel' => [
+        'enabled' => env('WHATSAPP_CLOUD_PANEL_ENABLED', true),
+        'prefix' => env('WHATSAPP_CLOUD_PANEL_PREFIX', 'whatsapp/cloud/templates'),
+        'name' => 'whatsapp.cloud.panel',
+        'middleware' => ['web', 'auth'],
+        'ui_token' => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Credentials model
     |--------------------------------------------------------------------------
     |

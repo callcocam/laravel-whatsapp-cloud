@@ -117,6 +117,46 @@ use Callcocam\WhatsAppCloud\Templates\MetaTemplate;
 WhatsApp::registerTemplate('assignment', new MetaTemplate('coordena_assignment', 'pt_BR', 'utility', ['name', 'event', 'url']));
 ```
 
+### Painel de templates (Inertia + Vue)
+
+Uma página web para **criar, listar, editar, apagar e enviar teste** de templates —
+o mesmo `TemplateManager` do CLI, com preview estilo WhatsApp. Fica em
+`/whatsapp/cloud/templates` (configurável).
+
+Opcional e desacoplado do núcleo: só é registrada quando o app tem Inertia
+instalado. Para habilitar num app com Inertia + Vue + Vite:
+
+```bash
+composer require inertiajs/inertia-laravel
+npm install @inertiajs/vue3            # se ainda não tiver
+php artisan vendor:publish --tag=whatsapp-cloud-inertia
+npm run build
+```
+
+O publish copia as páginas Vue para `resources/js/Pages/WhatsAppCloud/` (onde o
+resolver padrão do Inertia — `resolvePageComponent('./Pages/**/*.vue')` — as
+encontra) para o Vite do app compilá-las.
+
+Configuração em `config/whatsapp-cloud.php`:
+
+```php
+'panel' => [
+    'enabled'    => env('WHATSAPP_CLOUD_PANEL_ENABLED', true),
+    'prefix'     => env('WHATSAPP_CLOUD_PANEL_PREFIX', 'whatsapp/cloud/templates'),
+    'name'       => 'whatsapp.cloud.panel',
+    'middleware' => ['web', 'auth'],  // adicione sua autorização (ex.: 'can:...')
+    'ui_token'   => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'), // defesa extra opcional
+],
+```
+
+O painel é poderoso (cria/apaga/envia), então já vem protegido por `['web','auth']`.
+Se `WHATSAPP_CLOUD_PANEL_UI_TOKEN` estiver setado, toda requisição precisa mandar
+o mesmo valor no header `X-WA-UI-Token`. O protótipo opera no tenant `default`;
+o gancho para escolher o número/tenant fica em `TemplatePanelController::tenant()`.
+
+CSRF é automático (Inertia). Criar/editar enviam o template para análise da Meta
+(status `PENDING`); editar um aprovado o reseta para nova análise.
+
 ### Credenciais (multi-tenant)
 
 Implemente o contrato no seu model (ou use a trait) e binde um resolver:

@@ -40,6 +40,27 @@ final class TemplateManager
     }
 
     /**
+     * Edit an existing template by its id (components and/or category).
+     *
+     * Meta only allows editing an APPROVED, REJECTED or PAUSED template (never a
+     * PENDING one); a successful edit resets it to PENDING for re-review. The
+     * template `name` and `language` are NOT editable.
+     *
+     * @param  array<int, array<string, mixed>>  $components
+     * @return array<string, mixed>
+     */
+    public function edit(string $id, array $components, ?string $category = null): array
+    {
+        $payload = ['components' => $components];
+
+        if ($category !== null && $category !== '') {
+            $payload['category'] = strtoupper($category);
+        }
+
+        return $this->handle(fn () => $this->request()->post($id, $payload))->json();
+    }
+
+    /**
      * List the WABA templates (optionally filtered by name).
      *
      * @return array<string, mixed>

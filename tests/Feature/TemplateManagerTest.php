@@ -23,6 +23,23 @@ it('creates a template on the WABA endpoint', function () {
     });
 });
 
+it('edits an existing template by id', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['success' => true])]);
+
+    app(WhatsAppManager::class)->templateApi()->edit('123', [
+        ['type' => 'BODY', 'text' => 'Oi {{1}}, tudo certo!', 'example' => ['body_text' => [['Ana']]]],
+    ], 'utility');
+
+    Http::assertSent(function (Request $r) {
+        // Edit hits the template id directly on the graph base, not the WABA node.
+        return $r->method() === 'POST'
+            && str_contains($r->url(), '/v21.0/123')
+            && ! str_contains($r->url(), 'message_templates')
+            && $r->data()['category'] === 'UTILITY'
+            && $r->data()['components'][0]['type'] === 'BODY';
+    });
+});
+
 it('lists templates on the WABA', function () {
     Http::fake(['graph.facebook.com/*' => Http::response(['data' => [
         ['name' => 'coordena_x', 'language' => 'pt_BR', 'category' => 'UTILITY', 'status' => 'APPROVED'],

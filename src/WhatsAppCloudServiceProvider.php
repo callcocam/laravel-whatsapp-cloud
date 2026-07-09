@@ -12,6 +12,7 @@ use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Inertia\Inertia;
 
 class WhatsAppCloudServiceProvider extends ServiceProvider
 {
@@ -47,6 +48,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerRoutes();
+        $this->registerPanelRoutes();
         $this->registerPublishing();
 
         if ($this->app->runningInConsole()) {
@@ -81,6 +83,28 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Register the Inertia template-management panel routes. Only wires up when
+     * the panel is enabled AND Inertia is installed — the core library stays
+     * headless for apps that only send messages.
+     */
+    protected function registerPanelRoutes(): void
+    {
+        $config = $this->app['config'];
+
+        if (! $config->get('whatsapp-cloud.panel.enabled', true) || ! class_exists(Inertia::class)) {
+            return;
+        }
+
+        Route::group([
+            'prefix' => $config->get('whatsapp-cloud.panel.prefix', 'whatsapp/cloud/templates'),
+            'middleware' => $config->get('whatsapp-cloud.panel.middleware', ['web', 'auth']),
+            'as' => $config->get('whatsapp-cloud.panel.name', 'whatsapp.cloud.panel').'.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__.'/../routes/panel.php');
+        });
+    }
+
     protected function registerPublishing(): void
     {
         if (! $this->app->runningInConsole()) {
@@ -94,5 +118,12 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../database/migrations/2026_01_01_000000_create_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_numbers_table.php'),
         ], 'whatsapp-cloud-migrations');
+
+        // The panel's Vue pages must be compiled by the host app's Vite build, so
+        // publish them into resources/js/Pages/ where the default Inertia page
+        // resolver (`resolvePageComponent('./Pages/**/*.vue')`) finds them.
+        $this->publishes([
+            __DIR__.'/../resources/js/Pages/WhatsAppCloud' => resource_path('js/Pages/WhatsAppCloud'),
+        ], 'whatsapp-cloud-inertia');
     }
 }

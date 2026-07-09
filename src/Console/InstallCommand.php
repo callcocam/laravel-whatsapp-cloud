@@ -3,6 +3,7 @@
 namespace Callcocam\WhatsAppCloud\Console;
 
 use Illuminate\Console\Command;
+use Inertia\Inertia;
 
 class InstallCommand extends Command
 {
@@ -24,6 +25,17 @@ class InstallCommand extends Command
             '--force' => $force,
         ]) === self::SUCCESS);
 
+        $hasInertia = class_exists(Inertia::class);
+
+        if ($hasInertia) {
+            $this->components->task('Publishing template panel (Vue pages)', fn () => $this->callSilently('vendor:publish', [
+                '--tag' => 'whatsapp-cloud-inertia',
+                '--force' => $force,
+            ]) === self::SUCCESS);
+        }
+
+        $panelPrefix = ltrim((string) config('whatsapp-cloud.panel.prefix', 'whatsapp/cloud/templates'), '/');
+
         $this->newLine();
         $this->components->info('WhatsApp Cloud installed. Next steps:');
         $this->components->bulletList([
@@ -33,6 +45,9 @@ class InstallCommand extends Command
             'Declare templates in config/whatsapp-cloud.php and create them on Meta with `php artisan whatsapp:template:create <name>`.',
             'Point Meta\'s webhook at /'.ltrim((string) config('whatsapp-cloud.webhook.prefix', 'webhooks/whatsapp/cloud'), '/').' and (optionally) listen to WhatsAppMessageReceived / WhatsAppStatusReceived.',
             'Send: WhatsApp::for($tenant)->sendTemplate(\'key\', [...]);',
+            $hasInertia
+                ? 'Template panel: run `npm run build`, then browse /'.$panelPrefix.' (guarded by the [web, auth] middleware; set WHATSAPP_CLOUD_PANEL_UI_TOKEN for extra defense).'
+                : 'Template panel (optional): require inertiajs/inertia-laravel + @inertiajs/vue3, then re-run install and `npm run build` to manage templates at /'.$panelPrefix.'.',
         ]);
 
         return self::SUCCESS;
