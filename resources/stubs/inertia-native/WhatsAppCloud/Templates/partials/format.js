@@ -1,6 +1,5 @@
 // Formatting/parsing helpers for the WhatsApp template panel.
-// Pure business logic (mirrors the server guard-rails) — copied VERBATIM from the
-// package. Do not rewrite; upgrade by re-copying from the package if it changes.
+// Ported from the standalone admin SPA (web/app.js).
 
 /** Escape HTML so raw template text renders safely. */
 export function escapeHtml(s) {
@@ -26,22 +25,6 @@ export function maxVar(text) {
     return m.reduce((mx, tok) => Math.max(mx, parseInt(tok.replace(/\D/g, ''), 10) || 0), 0)
 }
 
-export function statusClass(s) {
-    s = String(s || '').toUpperCase()
-    if (s === 'APPROVED') return 'approved'
-    if (s === 'REJECTED') return 'rejected'
-    if (s === 'PENDING' || s === 'IN_APPEAL' || s === 'PENDING_DELETION') return 'pending'
-    return 'paused'
-}
-
-export function statusLabel(s) {
-    return String(s || '?').toUpperCase()
-}
-
-export function catClass(c) {
-    return String(c || '').toLowerCase()
-}
-
 /**
  * Format an estimated cost. `conversation_analytics` returns a bare number in the
  * account's billing currency; pass the configured ISO code (e.g. 'BRL') to get a
@@ -57,6 +40,22 @@ export function formatMoney(value, currency) {
         }
     }
     return n.toFixed(2)
+}
+
+export function statusClass(s) {
+    s = String(s || '').toUpperCase()
+    if (s === 'APPROVED') return 'approved'
+    if (s === 'REJECTED') return 'rejected'
+    if (s === 'PENDING' || s === 'IN_APPEAL' || s === 'PENDING_DELETION') return 'pending'
+    return 'paused'
+}
+
+export function statusLabel(s) {
+    return String(s || '?').toUpperCase()
+}
+
+export function catClass(c) {
+    return String(c || '').toLowerCase()
 }
 
 /**
