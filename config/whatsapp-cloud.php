@@ -86,6 +86,20 @@ return [
         'prefix' => env('WHATSAPP_CLOUD_PANEL_PREFIX', 'whatsapp/cloud/templates'),
         'name' => 'whatsapp.cloud.panel',
         'middleware' => ['web', 'auth'],
+
+        // The Inertia component the panel renders. Ships with the self-contained
+        // fallback page (published via `whatsapp-cloud-inertia`). A host with a
+        // design system can scaffold a NATIVE page at the same path
+        // (`php artisan whatsapp:panel:scaffold`) and point this at it — the
+        // package stays the owner of the backend either way.
+        'component' => env('WHATSAPP_CLOUD_PANEL_COMPONENT', 'WhatsAppCloud/Templates/Index'),
+
+        // Optional authorization gate. When set, the provider appends
+        // "can:<gate>" to the panel middleware — the panel mutates the WABA
+        // (shared in multi-tenant apps), so restricting beyond [web, auth] is
+        // recommended.
+        'gate' => env('WHATSAPP_CLOUD_PANEL_GATE'),
+
         'ui_token' => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'),
     ],
 

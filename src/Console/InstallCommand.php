@@ -36,9 +36,7 @@ class InstallCommand extends Command
 
         $panelPrefix = ltrim((string) config('whatsapp-cloud.panel.prefix', 'whatsapp/cloud/templates'), '/');
 
-        $this->newLine();
-        $this->components->info('WhatsApp Cloud installed. Next steps:');
-        $this->components->bulletList([
+        $checklist = [
             'Run `php artisan migrate` (creates the whatsapp_numbers table).',
             'Set WHATSAPP_CLOUD_APP_SECRET, WHATSAPP_CLOUD_VERIFY_TOKEN and WHATSAPP_CLOUD_GRAPH_VERSION in .env.',
             'Register a number: fill whatsapp_numbers, or implement WhatsAppCredentials on your model and bind a resolver.',
@@ -48,7 +46,16 @@ class InstallCommand extends Command
             $hasInertia
                 ? 'Template panel: run `npm run build`, then browse /'.$panelPrefix.' (guarded by the [web, auth] middleware; set WHATSAPP_CLOUD_PANEL_UI_TOKEN for extra defense).'
                 : 'Template panel (optional): require inertiajs/inertia-laravel + @inertiajs/vue3, then re-run install and `npm run build` to manage templates at /'.$panelPrefix.'.',
-        ]);
+        ];
+
+        if ($hasInertia) {
+            $checklist[] = 'For a NATIVE UI in your own design system (shadcn-vue), run `php artisan whatsapp:panel:scaffold` and point `panel.component` at it.';
+            $checklist[] = 'Lock the panel down: set WHATSAPP_CLOUD_PANEL_GATE to an authorization gate — it mutates the shared WABA.';
+        }
+
+        $this->newLine();
+        $this->components->info('WhatsApp Cloud installed. Next steps:');
+        $this->components->bulletList($checklist);
 
         return self::SUCCESS;
     }

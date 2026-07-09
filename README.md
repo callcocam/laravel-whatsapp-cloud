@@ -128,6 +128,18 @@ o mesmo `TemplateManager` do CLI, com preview estilo WhatsApp. Fica em
 tem Inertia instalado (`inertiajs/inertia-laravel`). Quem só envia mensagens não
 carrega nada de frontend.
 
+O **backend** (controller, rotas, `TemplateManager`) é sempre do pacote. A
+**página** vem em dois modos — escolha um:
+
+| Modo | Como | Pra quem |
+|---|---|---|
+| **Fallback autônoma** | `vendor:publish --tag=whatsapp-cloud-inertia` — página self-contained (CSS próprio, sem design system) | Apps sem design system; funciona na hora |
+| **Scaffold nativo** | `php artisan whatsapp:panel:scaffold` — gera páginas **shadcn-vue** que você passa a ser dono | Apps com shadcn-vue + `@lucide/vue` + `vue-sonner` + `AppLayout` |
+
+Nos dois casos o pacote continua dono do backend; só o **contrato de props**
+(`templates`, `waConfig`, `loadError`, `panelUrl`) atravessa a fronteira — então
+atualizar o pacote **não exige recopiar a página**.
+
 #### Habilitar (app com Inertia + Vue + Vite)
 
 1. **Dependências** (se ainda não tiver Inertia no app):
@@ -180,7 +192,13 @@ carrega nada de frontend.
     'enabled'    => env('WHATSAPP_CLOUD_PANEL_ENABLED', true),
     'prefix'     => env('WHATSAPP_CLOUD_PANEL_PREFIX', 'whatsapp/cloud/templates'),
     'name'       => 'whatsapp.cloud.panel',
-    'middleware' => ['web', 'auth'],  // adicione sua autorização (ex.: 'can:manage-whatsapp')
+    'middleware' => ['web', 'auth'],
+    // Componente Inertia renderizado. Aponte para sua página nativa (scaffold)
+    // ou deixe no default (fallback autônoma).
+    'component'  => env('WHATSAPP_CLOUD_PANEL_COMPONENT', 'WhatsAppCloud/Templates/Index'),
+    // Gate de autorização opcional: quando setado, o pacote anexa 'can:<gate>'
+    // à middleware do painel (ele mexe na WABA compartilhada).
+    'gate'       => env('WHATSAPP_CLOUD_PANEL_GATE'),
     'ui_token'   => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'), // defesa extra opcional
 ],
 ```
@@ -190,14 +208,41 @@ Env correspondente:
 ```dotenv
 WHATSAPP_CLOUD_PANEL_ENABLED=true
 WHATSAPP_CLOUD_PANEL_PREFIX=whatsapp/cloud/templates
+# WHATSAPP_CLOUD_PANEL_COMPONENT=WhatsAppCloud/Templates/Index
+# WHATSAPP_CLOUD_PANEL_GATE=manage-whatsapp-templates
 # WHATSAPP_CLOUD_PANEL_UI_TOKEN=um-token-secreto
 ```
 
-O painel é poderoso (cria/apaga/envia), então já vem protegido por `['web','auth']`
-— troque/estenda o `middleware` pela sua regra de autorização. Se
-`WHATSAPP_CLOUD_PANEL_UI_TOKEN` estiver setado, toda requisição precisa mandar o
-mesmo valor no header `X-WA-UI-Token` (defesa em profundidade). Link no seu menu com
-o nome de rota: `route('whatsapp.cloud.panel.index')`.
+O painel é poderoso (cria/apaga/envia numa WABA que costuma ser **compartilhada**
+entre times), então proteja-o:
+
+- **Gate** (recomendado): setar `panel.gate` faz o pacote anexar `can:<gate>` à
+  middleware. Defina o gate no app (ex.: `Gate::define('manage-whatsapp-templates', …)`).
+- **`middleware`**: já vem `['web','auth']` — troque/estenda como quiser.
+- **`ui_token`**: se `WHATSAPP_CLOUD_PANEL_UI_TOKEN` estiver setado, toda requisição
+  precisa mandar o mesmo valor no header `X-WA-UI-Token` (defesa em profundidade).
+
+Link no seu menu com o nome de rota: `route('whatsapp.cloud.panel.index')`.
+
+#### UI nativa no seu design system (scaffold)
+
+Quer o painel com a **cara do seu app** (shadcn-vue) em vez da página autônoma? Rode:
+
+```bash
+php artisan whatsapp:panel:scaffold           # --force pra sobrescrever
+```
+
+Copia páginas **shadcn-vue** para `resources/js/pages/WhatsAppCloud/Templates/` (que
+você passa a ser dono), removendo o sufixo `.stub`. Depois:
+
+1. Aponte o painel: `WHATSAPP_CLOUD_PANEL_COMPONENT=WhatsAppCloud/Templates/Index`.
+2. Garanta os pré-requisitos: shadcn-vue (`@/components/ui/*`), `@lucide/vue`,
+   `vue-sonner` e `@/layouts/AppLayout.vue`.
+3. `npm run build` (e typecheck com `vue-tsc --noEmit`).
+
+O contrato de props é o mesmo da fallback (`templates`, `waConfig`, `loadError`,
+`panelUrl`), e o `flash` de sucesso vem no shape `flash.toast = { type, message }`
+(no `send`, com `flash.sent_id`) — o Index nativo já faz a ponte pro `vue-sonner`.
 
 #### Usando a interface
 

@@ -27,7 +27,7 @@
         "laravel/pint": "^1.20"
     },
     "suggest": {
-        "inertiajs/inertia-laravel": "Enables the template-management web panel (Inertia + Vue). Publish its Vue pages with `vendor:publish --tag=whatsapp-cloud-inertia`."
+        "inertiajs/inertia-laravel": "Enables the template-management web panel (Inertia + Vue). Publish the self-contained fallback page with `vendor:publish --tag=whatsapp-cloud-inertia`, or scaffold a native shadcn-vue page with `php artisan whatsapp:panel:scaffold`."
     },
     "autoload": {
         "psr-4": {

@@ -6,6 +6,7 @@ use Callcocam\WhatsAppCloud\Console\CreateTemplate;
 use Callcocam\WhatsAppCloud\Console\GetTemplate;
 use Callcocam\WhatsAppCloud\Console\InstallCommand;
 use Callcocam\WhatsAppCloud\Console\ListTemplates;
+use Callcocam\WhatsAppCloud\Console\ScaffoldPanel;
 use Callcocam\WhatsAppCloud\Console\SendTemplate;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
@@ -58,6 +59,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
                 CreateTemplate::class,
                 SendTemplate::class,
                 InstallCommand::class,
+                ScaffoldPanel::class,
             ]);
         }
     }
@@ -96,9 +98,17 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
             return;
         }
 
+        $middleware = (array) $config->get('whatsapp-cloud.panel.middleware', ['web', 'auth']);
+
+        // The panel mutates the WABA (shared across tenants). When a gate is
+        // configured, require it on every panel request via `can:<gate>`.
+        if ($gate = $config->get('whatsapp-cloud.panel.gate')) {
+            $middleware[] = 'can:'.$gate;
+        }
+
         Route::group([
             'prefix' => $config->get('whatsapp-cloud.panel.prefix', 'whatsapp/cloud/templates'),
-            'middleware' => $config->get('whatsapp-cloud.panel.middleware', ['web', 'auth']),
+            'middleware' => $middleware,
             'as' => $config->get('whatsapp-cloud.panel.name', 'whatsapp.cloud.panel').'.',
         ], function () {
             $this->loadRoutesFrom(__DIR__.'/../routes/panel.php');

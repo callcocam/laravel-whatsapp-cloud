@@ -43,7 +43,7 @@ class TemplatePanelController
             $loadError = $e->getMessage();
         }
 
-        return Inertia::render('WhatsAppCloud/Templates/Index', [
+        return Inertia::render($this->component(), [
             'templates' => array_values($templates),
             'waConfig' => $this->publicConfig($request),
             'loadError' => $loadError,
@@ -62,9 +62,7 @@ class TemplatePanelController
             $payload = TemplateInput::toPayload($request->all());
             $this->manager($request)->create($payload);
 
-            return back()->with('flash', [
-                'success' => "Template \"{$payload['name']}\" enviado para análise.",
-            ]);
+            return $this->ok("Template \"{$payload['name']}\" enviado para análise.");
         });
     }
 
@@ -79,9 +77,7 @@ class TemplatePanelController
             $payload = TemplateInput::toPayload($request->all());
             $this->manager($request)->edit($id, $payload['components'], $payload['category'] ?? null);
 
-            return back()->with('flash', [
-                'success' => "Template \"{$payload['name']}\" enviado para nova análise.",
-            ]);
+            return $this->ok("Template \"{$payload['name']}\" enviado para nova análise.");
         });
     }
 
@@ -95,7 +91,7 @@ class TemplatePanelController
         return $this->run(function () use ($request, $name): RedirectResponse {
             $this->manager($request)->delete($name);
 
-            return back()->with('flash', ['success' => "Template \"{$name}\" apagado."]);
+            return $this->ok("Template \"{$name}\" apagado.");
         });
     }
 
@@ -125,10 +121,7 @@ class TemplatePanelController
             $result = $this->manager($request)->send($name, $to, $params, $language);
             $id = data_get($result, 'messages.0.id');
 
-            return back()->with('flash', [
-                'success' => "Mensagem enviada para {$to}.",
-                'sent_id' => is_string($id) ? $id : null,
-            ]);
+            return $this->ok("Mensagem enviada para {$to}.", ['sent_id' => is_string($id) ? $id : null]);
         });
     }
 
@@ -189,6 +182,30 @@ class TemplatePanelController
         // Prototype: always the config `default` tenant. Wire a selector here
         // (e.g. return $request->query('tenant')) when going multi-tenant.
         return null;
+    }
+
+    /**
+     * Emit a normalized success flash. The shape is `flash.toast` so a native
+     * host page can drive vue-sonner straight from the server; the fallback page
+     * fires its own client-side toast on `onSuccess`, so it ignores this. Any
+     * `$extra` (e.g. `sent_id`) is merged at the top level of `flash`.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function ok(string $message, array $extra = []): RedirectResponse
+    {
+        return back()->with('flash', [
+            'toast' => ['type' => 'success', 'message' => $message],
+        ] + $extra);
+    }
+
+    /**
+     * The Inertia component to render. Configurable so a host can own a native
+     * page at the same route while the package keeps the backend.
+     */
+    private function component(): string
+    {
+        return (string) config('whatsapp-cloud.panel.component', 'WhatsAppCloud/Templates/Index');
     }
 
     private function routeName(): string

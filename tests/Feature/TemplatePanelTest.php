@@ -1,7 +1,9 @@
 <?php
 
+use Callcocam\WhatsAppCloud\WhatsAppCloudServiceProvider;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -29,6 +31,17 @@ it('renders the panel with the templates and public config', function () {
             ->where('waConfig.waba_id', '999888777')
             ->where('waConfig.phone_number_id', '111222333')
         );
+});
+
+it('renders the configured component (host can own a native page)', function () {
+    config(['whatsapp-cloud.panel.component' => 'WhatsAppCloud/Custom/Native']);
+    Http::fake(['graph.facebook.com/*' => Http::response(['data' => []])]);
+
+    // The native page lives in the host's tree, not the package's — assert the
+    // component name without the file-existence check.
+    $this->get(panelUrl())
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('WhatsAppCloud/Custom/Native', false));
 });
 
 it('creates a template from the form payload', function () {
@@ -118,4 +131,48 @@ it('enforces the ui token when configured', function () {
     $this->get(panelUrl())->assertStatus(401);
 
     $this->get(panelUrl(), ['X-WA-UI-Token' => 'secret'])->assertOk();
+});
+
+it('normalizes a success flash into the toast shape on store', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['id' => 'tpl_1', 'status' => 'PENDING'], 201)]);
+
+    $this->post(panelUrl(), [
+        'name' => 'coordena_novo',
+        'language' => 'pt_BR',
+        'category' => 'UTILITY',
+        'body' => 'Olá, {{1}}! Bem-vindo.',
+        'bodyExamples' => ['Maria'],
+    ])->assertRedirect()->assertSessionHas('flash', fn ($flash) => $flash['toast']['type'] === 'success'
+        && str_contains($flash['toast']['message'], 'enviado para análise'));
+});
+
+it('includes the sent_id alongside the toast on send', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.S']]])]);
+
+    $this->post(panelUrl('/send'), [
+        'name' => 'coordena_x',
+        'to' => '5548999999999',
+        'params' => ['Ana'],
+        'language' => 'pt_BR',
+    ])->assertRedirect()->assertSessionHas('flash', fn ($flash) => $flash['toast']['type'] === 'success'
+        && $flash['sent_id'] === 'wamid.S');
+});
+
+it('blocks the panel when the configured gate denies', function () {
+    config(['whatsapp-cloud.panel.gate' => 'manage-wa-templates']);
+    Gate::define('manage-wa-templates', fn () => false);
+    // Re-register so the panel routes pick up the `can:<gate>` middleware.
+    $this->app->register(WhatsAppCloudServiceProvider::class, true);
+    Http::fake(['graph.facebook.com/*' => Http::response(['data' => []])]);
+
+    $this->get(panelUrl())->assertForbidden();
+});
+
+it('allows the panel when the configured gate passes', function () {
+    config(['whatsapp-cloud.panel.gate' => 'manage-wa-templates']);
+    Gate::define('manage-wa-templates', fn () => true);
+    $this->app->register(WhatsAppCloudServiceProvider::class, true);
+    Http::fake(['graph.facebook.com/*' => Http::response(['data' => []])]);
+
+    $this->get(panelUrl())->assertOk();
 });
