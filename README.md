@@ -13,7 +13,8 @@ e eventos, e gestão de templates via Artisan.
   com fallback pras credenciais default do config (dev/single-tenant).
 - **Webhook** GET (hub-challenge) + POST (assinatura `X-Hub-Signature-256`),
   disparando eventos — sem regra de negócio dentro do pacote.
-- **Templates**: registry (config + runtime) e comandos `whatsapp:template:*`.
+- **Templates**: registry (config + runtime), comandos `whatsapp:template:*` e um
+  **painel web** opcional (Inertia + Vue) pra criar/editar/enviar.
 - **Erros terminais** da Meta mapeados (`isTemporaryRestriction()`) pra você não
   re-tentar o que não adianta (janela de 24h fechada, template pausado, etc.).
 
@@ -123,39 +124,97 @@ Uma página web para **criar, listar, editar, apagar e enviar teste** de templat
 o mesmo `TemplateManager` do CLI, com preview estilo WhatsApp. Fica em
 `/whatsapp/cloud/templates` (configurável).
 
-Opcional e desacoplado do núcleo: só é registrada quando o app tem Inertia
-instalado. Para habilitar num app com Inertia + Vue + Vite:
+É **opcional e desacoplado do núcleo**: as rotas só são registradas quando o app
+tem Inertia instalado (`inertiajs/inertia-laravel`). Quem só envia mensagens não
+carrega nada de frontend.
 
-```bash
-composer require inertiajs/inertia-laravel
-npm install @inertiajs/vue3            # se ainda não tiver
-php artisan vendor:publish --tag=whatsapp-cloud-inertia
-npm run build
-```
+#### Habilitar (app com Inertia + Vue + Vite)
 
-O publish copia as páginas Vue para `resources/js/Pages/WhatsAppCloud/` (onde o
-resolver padrão do Inertia — `resolvePageComponent('./Pages/**/*.vue')` — as
-encontra) para o Vite do app compilá-las.
+1. **Dependências** (se ainda não tiver Inertia no app):
 
-Configuração em `config/whatsapp-cloud.php`:
+   ```bash
+   composer require inertiajs/inertia-laravel
+   npm install @inertiajs/vue3
+   php artisan inertia:middleware   # cria app/Http/Middleware/HandleInertiaRequests.php
+   ```
+
+   Registre o middleware no grupo `web` (Laravel 11+ em `bootstrap/app.php`):
+
+   ```php
+   ->withMiddleware(function (Middleware $middleware) {
+       $middleware->web(append: [\App\Http\Middleware\HandleInertiaRequests::class]);
+   })
+   ```
+
+2. **Publique as páginas Vue** e rebuild o Vite:
+
+   ```bash
+   php artisan vendor:publish --tag=whatsapp-cloud-inertia
+   npm run build     # ou: npm run dev
+   ```
+
+   O publish copia os componentes para `resources/js/Pages/WhatsAppCloud/`, onde o
+   resolver padrão do Inertia — `resolvePageComponent('./Pages/**/*.vue')` — os
+   encontra. Nada de CDN/assets do pacote: quem compila é o Vite do app.
+
+3. **Compartilhe o `flash`** no `HandleInertiaRequests::share()` para as
+   mensagens de sucesso e o id da mensagem enviada aparecerem:
+
+   ```php
+   public function share(Request $request): array
+   {
+       return array_merge(parent::share($request), [
+           'flash' => fn () => $request->session()->get('flash'),
+       ]);
+   }
+   ```
+
+4. **Acesse** `/whatsapp/cloud/templates` autenticado. Sem isso, a rota (grupo
+   `auth`) redireciona pro login.
+
+#### Configuração
 
 ```php
+// config/whatsapp-cloud.php
 'panel' => [
     'enabled'    => env('WHATSAPP_CLOUD_PANEL_ENABLED', true),
     'prefix'     => env('WHATSAPP_CLOUD_PANEL_PREFIX', 'whatsapp/cloud/templates'),
     'name'       => 'whatsapp.cloud.panel',
-    'middleware' => ['web', 'auth'],  // adicione sua autorização (ex.: 'can:...')
+    'middleware' => ['web', 'auth'],  // adicione sua autorização (ex.: 'can:manage-whatsapp')
     'ui_token'   => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'), // defesa extra opcional
 ],
 ```
 
-O painel é poderoso (cria/apaga/envia), então já vem protegido por `['web','auth']`.
-Se `WHATSAPP_CLOUD_PANEL_UI_TOKEN` estiver setado, toda requisição precisa mandar
-o mesmo valor no header `X-WA-UI-Token`. O protótipo opera no tenant `default`;
-o gancho para escolher o número/tenant fica em `TemplatePanelController::tenant()`.
+Env correspondente:
 
-CSRF é automático (Inertia). Criar/editar enviam o template para análise da Meta
-(status `PENDING`); editar um aprovado o reseta para nova análise.
+```dotenv
+WHATSAPP_CLOUD_PANEL_ENABLED=true
+WHATSAPP_CLOUD_PANEL_PREFIX=whatsapp/cloud/templates
+# WHATSAPP_CLOUD_PANEL_UI_TOKEN=um-token-secreto
+```
+
+O painel é poderoso (cria/apaga/envia), então já vem protegido por `['web','auth']`
+— troque/estenda o `middleware` pela sua regra de autorização. Se
+`WHATSAPP_CLOUD_PANEL_UI_TOKEN` estiver setado, toda requisição precisa mandar o
+mesmo valor no header `X-WA-UI-Token` (defesa em profundidade). Link no seu menu com
+o nome de rota: `route('whatsapp.cloud.panel.index')`.
+
+#### Usando a interface
+
+- **Listagem**: tabela com nome, idioma, categoria e status; filtros por status /
+  categoria, busca por nome e contadores no topo.
+- **Novo / Editar**: formulário completo (cabeçalho, corpo com `{{1}}`, exemplos por
+  variável, rodapé e botões `QUICK_REPLY` / `URL` / `PHONE_NUMBER`) com
+  **pré-visualização ao vivo** estilo bolha do WhatsApp. Nome e idioma são imutáveis
+  ao editar.
+- **Enviar teste**: dispara um template aprovado pra um número, preenchendo as
+  variáveis do corpo.
+- **Apagar**: remove **todos os idiomas** com aquele nome na WABA (há confirmação).
+
+Notas: CSRF é automático (Inertia). **Criar e editar são assíncronos** — vão para
+análise da Meta (status `PENDING`); editar um aprovado o reseta para nova análise. A
+categoria pode ser reclassificada pela Meta. O painel opera no tenant `default`; o
+gancho para escolher o número/tenant é o `TemplatePanelController::tenant()`.
 
 ### Credenciais (multi-tenant)
 
@@ -221,8 +280,9 @@ que retorna `TemplateBuilder::...->toArray()`.
 ## Configuração
 
 Veja [`config/whatsapp-cloud.php`](config/whatsapp-cloud.php): `graph_version`,
-`app_secret`, `verify_token`, `default` (creds dev), `webhook`, `model`,
-`templates`, `definitions_path`.
+`app_secret`, `verify_token`, `default` (creds dev), `webhook`, `panel`
+([painel de templates](#painel-de-templates-inertia--vue)), `model`, `templates`,
+`definitions_path`.
 
 ## Testes
 
