@@ -269,6 +269,36 @@ análise da Meta (status `PENDING`); editar um aprovado o reseta para nova anál
 categoria pode ser reclassificada pela Meta. O painel opera no tenant `default`; o
 gancho para escolher o número/tenant é o `TemplatePanelController::tenant()`.
 
+#### Integração no app consumidor (Coordena — Parte B)
+
+> **Nota de handoff.** A **Parte A** (este pacote) está pronta na branch
+> `feature/template-panel`. A **Parte B** (página nativa no design system) é feita
+> no repo do **Coordena** — plano completo em
+> [`docs/plans/2026-07-09-painel-templates-nativo-host.md`](docs/plans/2026-07-09-painel-templates-nativo-host.md).
+
+Commits do pacote que o Coordena consome (branch `feature/template-panel`):
+
+- **`2091f0c`** — painel headless: `panel.component` configurável, `panel.gate`,
+  flash normalizado (`flash.toast`) e o comando `whatsapp:panel:scaffold` + stubs
+  nativos (shadcn-vue).
+- **`61e614a`** — card de gasto estimado (`TemplateManager::costs()` + prop `costs`
+  + `panel.currency`).
+
+**Contrato de props (congelado — o backend fica no pacote):**
+
+| Prop | Tipo | Descrição |
+|---|---|---|
+| `templates` | `array<object>` | Templates crus da Meta (`{ id, name, language, category, status, components[], rejected_reason? }`) |
+| `waConfig` | `{ waba_id, phone_number_id, api_version }` | Credenciais **públicas** (nunca o token) |
+| `loadError` | `string \| null` | Erro ao carregar a lista |
+| `costs` | `object \| null` | `{ currency, total, conversations, period:{start,end}, byCategory:[{category,cost,conversations}] }` — `null` quando indisponível |
+| `panelUrl` | `string` | Base das rotas de mutação (o host concatena; **sem wayfinder**) |
+
+Config que o Coordena publica: `panel.component = WhatsAppCloud/Templates/Index`,
+`panel.gate = manage-whatsapp-templates`, `panel.currency = BRL`. Fluxo de sucesso
+via `flash.toast = { type, message }` (`send` inclui `flash.sent_id`); erros via
+`errors.meta` / `errors.form`.
+
 ### Credenciais (multi-tenant)
 
 Implemente o contrato no seu model (ou use a trait) e binde um resolver:
