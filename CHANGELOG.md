@@ -18,6 +18,11 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
   `AppLayout`) into `resources/js/pages/WhatsAppCloud/Templates/`, dropping the
   `.stub` suffix. The host then owns the page; the package still owns the backend
   and the frozen props contract.
+- **Estimated-cost card** — `TemplateManager::costs()` reads the WABA
+  `conversation_analytics` edge; the panel renders a current-month cost summary
+  grouped by category (fallback + native). Best-effort: hidden when the token
+  lacks `whatsapp_business_management`. Currency via `panel.currency`
+  (`WHATSAPP_CLOUD_PANEL_CURRENCY`).
 
 ### Changed
 - **Normalized success flash** — the panel controller emits

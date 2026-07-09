@@ -36,9 +36,12 @@ class TemplatePanelController
 
         $templates = [];
         $loadError = null;
+        $costs = null;
 
         try {
-            $templates = $this->manager($request)->all()['data'] ?? [];
+            $manager = $this->manager($request);
+            $templates = $manager->all()['data'] ?? [];
+            $costs = $this->costSummary($manager);
         } catch (WhatsAppException $e) {
             $loadError = $e->getMessage();
         }
@@ -47,6 +50,7 @@ class TemplatePanelController
             'templates' => array_values($templates),
             'waConfig' => $this->publicConfig($request),
             'loadError' => $loadError,
+            'costs' => $costs,
             'panelUrl' => route($this->routeName()),
         ]);
     }
@@ -154,6 +158,54 @@ class TemplatePanelController
     private function manager(Request $request): TemplateManager
     {
         return app(WhatsAppManager::class)->templateApi($this->tenant($request));
+    }
+
+    /**
+     * Best-effort estimated-cost summary for the current month, grouped by
+     * category. Returns null when analytics isn't available (e.g. the token
+     * lacks `whatsapp_business_management`) so the panel still renders.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function costSummary(TemplateManager $manager): ?array
+    {
+        try {
+            $start = now()->startOfMonth()->timestamp;
+            $end = now()->timestamp;
+
+            /** @var array<int, mixed> $points */
+            $points = (array) data_get($manager->costs($start, $end), 'conversation_analytics.data.0.data_points', []);
+
+            /** @var array<string, array{category: string, cost: float, conversations: int}> $byCategory */
+            $byCategory = [];
+            $total = 0.0;
+            $conversations = 0;
+
+            foreach ($points as $point) {
+                $row = (array) $point;
+                $cost = (float) ($row['cost'] ?? 0);
+                $count = (int) ($row['conversation'] ?? 0);
+                $category = strtoupper((string) ($row['conversation_category'] ?? 'UNKNOWN'));
+
+                $bucket = $byCategory[$category] ?? ['category' => $category, 'cost' => 0.0, 'conversations' => 0];
+                $bucket['cost'] = round($bucket['cost'] + $cost, 2);
+                $bucket['conversations'] += $count;
+                $byCategory[$category] = $bucket;
+
+                $total += $cost;
+                $conversations += $count;
+            }
+
+            return [
+                'currency' => config('whatsapp-cloud.panel.currency'),
+                'total' => round($total, 2),
+                'conversations' => $conversations,
+                'period' => ['start' => $start, 'end' => $end],
+                'byCategory' => array_values($byCategory),
+            ];
+        } catch (WhatsAppException) {
+            return null;
+        }
     }
 
     /**

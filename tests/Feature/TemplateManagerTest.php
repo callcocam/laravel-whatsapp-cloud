@@ -64,6 +64,24 @@ it('sends an approved template through the phone number endpoint', function () {
     });
 });
 
+it('reads estimated costs from the WABA conversation_analytics edge', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['conversation_analytics' => ['data' => [[
+        'data_points' => [['conversation' => 10, 'cost' => 1.5, 'conversation_category' => 'MARKETING']],
+    ]]]])]);
+
+    app(WhatsAppManager::class)->templateApi()->costs(1_700_000_000, 1_700_500_000);
+
+    Http::assertSent(function (Request $r) {
+        $url = urldecode($r->url());
+
+        return $r->method() === 'GET'
+            && str_contains($url, '/v21.0/999888777?')
+            && str_contains($url, 'conversation_analytics.start(1700000000).end(1700500000)')
+            && str_contains($url, "metric_types(['COST','CONVERSATION'])")
+            && str_contains($url, "dimensions(['CONVERSATION_CATEGORY'])");
+    });
+});
+
 it('throws a CloudApiException on a failed management call', function () {
     Http::fake(['graph.facebook.com/*' => Http::response(['error' => ['message' => 'Bad', 'code' => 100]], 400)]);
 

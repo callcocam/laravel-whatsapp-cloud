@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
-import { catClass, statusClass } from './partials/format'
+import { catClass, formatMoney, statusClass } from './partials/format'
 import { pushToast, toasts } from './partials/toasts'
 import StatusBadge from './partials/StatusBadge.vue'
 import TemplateDetailModal from './partials/TemplateDetailModal.vue'
@@ -13,8 +13,13 @@ const props = defineProps({
     templates: { type: Array, default: () => [] },
     waConfig: { type: Object, default: () => ({}) },
     loadError: { type: String, default: null },
+    costs: { type: Object, default: null },
     panelUrl: { type: String, required: true },
 })
+
+function money(value) {
+    return formatMoney(value, props.costs && props.costs.currency)
+}
 
 const filters = reactive({ status: '', category: '', search: '' })
 
@@ -124,6 +129,20 @@ watch(
                         <div class="num">{{ templates.length }}</div>
                         <div class="lbl">Total</div>
                     </div>
+                </div>
+            </section>
+
+            <section v-if="costs" class="costs">
+                <div class="costs-total">
+                    <span class="lbl">Gastos <span class="est">(estimado)</span> · mês atual</span>
+                    <span class="amount">{{ money(costs.total) }}</span>
+                    <span class="sub">{{ costs.conversations }} conversas</span>
+                </div>
+                <div class="costs-cats">
+                    <span v-for="c in costs.byCategory" :key="c.category" class="cost-chip">
+                        <span class="cat" :class="catClass(c.category)">{{ c.category }}</span>
+                        <b>{{ money(c.cost) }}</b>
+                    </span>
                 </div>
             </section>
 

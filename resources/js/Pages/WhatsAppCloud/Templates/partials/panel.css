@@ -1019,6 +1019,46 @@
     to { transform: translateX(0); opacity: 1; }
 }
 
+/* ---------- Estimated cost ---------- */
+
+.wa-panel .costs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.wa-panel .costs-total {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.wa-panel .costs-total .lbl { color: var(--muted); font-size: 13px; }
+.wa-panel .costs-total .est { color: var(--faint); }
+.wa-panel .costs-total .amount { font-size: 20px; font-weight: 700; color: var(--text); }
+.wa-panel .costs-total .sub { color: var(--faint); font-size: 12px; }
+
+.wa-panel .costs-cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.wa-panel .cost-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text);
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 720px) {
@@ -1029,4 +1069,5 @@
     .wa-panel .toolbar .search { margin-left: 0; width: 100%; }
     .wa-panel .toolbar .search input { width: 100%; }
     .wa-panel .counter.total { margin-left: 0; }
+    .wa-panel .costs-cats { margin-left: 0; }
 }

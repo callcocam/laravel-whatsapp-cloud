@@ -140,6 +140,27 @@ final class TemplateManager
     }
 
     /**
+     * Estimated conversation cost for a time window, grouped by category.
+     *
+     * Reads the WABA `conversation_analytics` edge (COST + CONVERSATION metrics).
+     * The `cost` is an ESTIMATE in the account's billing currency — the source of
+     * truth for charges is the WhatsApp Manager / Meta billing. The access token
+     * needs the `whatsapp_business_management` permission.
+     *
+     * @param  int  $start  window start (unix seconds)
+     * @param  int  $end  window end (unix seconds)
+     * @return array<string, mixed>
+     */
+    public function costs(int $start, int $end, string $granularity = 'MONTHLY'): array
+    {
+        $fields = "conversation_analytics.start({$start}).end({$end})"
+            .".granularity({$granularity}).metric_types(['COST','CONVERSATION'])"
+            .".dimensions(['CONVERSATION_CATEGORY'])";
+
+        return $this->handle(fn () => $this->request()->get($this->wabaId, ['fields' => $fields]))->json();
+    }
+
+    /**
      * @param  callable(): Response  $callback
      */
     private function handle(callable $callback): Response

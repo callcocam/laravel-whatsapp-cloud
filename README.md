@@ -199,6 +199,8 @@ atualizar o pacote **não exige recopiar a página**.
     // Gate de autorização opcional: quando setado, o pacote anexa 'can:<gate>'
     // à middleware do painel (ele mexe na WABA compartilhada).
     'gate'       => env('WHATSAPP_CLOUD_PANEL_GATE'),
+    // Moeda (ISO) do card de gasto estimado; null mostra o número puro.
+    'currency'   => env('WHATSAPP_CLOUD_PANEL_CURRENCY'),
     'ui_token'   => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'), // defesa extra opcional
 ],
 ```
@@ -210,6 +212,7 @@ WHATSAPP_CLOUD_PANEL_ENABLED=true
 WHATSAPP_CLOUD_PANEL_PREFIX=whatsapp/cloud/templates
 # WHATSAPP_CLOUD_PANEL_COMPONENT=WhatsAppCloud/Templates/Index
 # WHATSAPP_CLOUD_PANEL_GATE=manage-whatsapp-templates
+# WHATSAPP_CLOUD_PANEL_CURRENCY=BRL
 # WHATSAPP_CLOUD_PANEL_UI_TOKEN=um-token-secreto
 ```
 
@@ -255,6 +258,11 @@ O contrato de props é o mesmo da fallback (`templates`, `waConfig`, `loadError`
 - **Enviar teste**: dispara um template aprovado pra um número, preenchendo as
   variáveis do corpo.
 - **Apagar**: remove **todos os idiomas** com aquele nome na WABA (há confirmação).
+- **Gastos (estimado)**: card com o custo do mês atual e a quebra por categoria,
+  lido de `conversation_analytics` da WABA. É **best-effort** — o token precisa da
+  permissão `whatsapp_business_management`; sem ela (ou em falha), o card some e o
+  resto do painel segue. O valor é **estimado** (a fonte oficial é o WhatsApp
+  Manager); ajuste a moeda com `panel.currency`.
 
 Notas: CSRF é automático (Inertia). **Criar e editar são assíncronos** — vão para
 análise da Meta (status `PENDING`); editar um aprovado o reseta para nova análise. A

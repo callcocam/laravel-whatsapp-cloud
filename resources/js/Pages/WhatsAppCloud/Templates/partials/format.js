@@ -42,6 +42,23 @@ export function catClass(c) {
 }
 
 /**
+ * Format an estimated cost. `conversation_analytics` returns a bare number in the
+ * account's billing currency; pass the configured ISO code (e.g. 'BRL') to get a
+ * localized currency string, or omit it for the plain number.
+ */
+export function formatMoney(value, currency) {
+    const n = Number(value || 0)
+    if (currency) {
+        try {
+            return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(n)
+        } catch {
+            // Invalid currency code — fall back to the plain number.
+        }
+    }
+    return n.toFixed(2)
+}
+
+/**
  * The `{{n}}` variable label for a 0-based index. Built in JS (not inline in the
  * template) because a literal `}}` inside a Vue mustache collides with the
  * interpolation delimiter.

@@ -133,6 +133,39 @@ it('enforces the ui token when configured', function () {
     $this->get(panelUrl(), ['X-WA-UI-Token' => 'secret'])->assertOk();
 });
 
+it('injects a monthly cost summary grouped by category', function () {
+    Http::fake([
+        '*message_templates*' => Http::response(['data' => []]),
+        '*' => Http::response(['conversation_analytics' => ['data' => [['data_points' => [
+            ['conversation' => 100, 'cost' => 18.44, 'conversation_category' => 'MARKETING'],
+            ['conversation' => 50, 'cost' => 8.72, 'conversation_category' => 'AUTHENTICATION'],
+        ]]]]]),
+    ]);
+
+    $this->get(panelUrl())
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('costs.total', fn ($total) => abs($total - 27.16) < 0.001)
+            ->where('costs.conversations', 150)
+            ->has('costs.byCategory', 2)
+            ->where('costs.byCategory.0.category', 'MARKETING'));
+
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'conversation_analytics'));
+});
+
+it('renders the panel without costs when analytics is unavailable', function () {
+    // Templates list succeeds; the analytics call is rejected (e.g. the token
+    // lacks whatsapp_business_management) — the page still renders, costs null.
+    Http::fake([
+        '*message_templates*' => Http::response(['data' => []]),
+        '*' => Http::response(['error' => ['message' => 'No permission', 'code' => 200]], 403),
+    ]);
+
+    $this->get(panelUrl())
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('costs', null));
+});
+
 it('normalizes a success flash into the toast shape on store', function () {
     Http::fake(['graph.facebook.com/*' => Http::response(['id' => 'tpl_1', 'status' => 'PENDING'], 201)]);
 

@@ -19,7 +19,7 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { statusClass } from './partials/format'
+import { formatMoney, statusClass } from './partials/format'
 import StatusBadge from './partials/StatusBadge.vue'
 import TemplateDetailModal from './partials/TemplateDetailModal.vue'
 import TemplateFormModal from './partials/TemplateFormModal.vue'
@@ -29,10 +29,15 @@ const props = defineProps({
     templates: { type: Array, default: () => [] },
     waConfig: { type: Object, default: () => ({}) },
     loadError: { type: String, default: null },
+    costs: { type: Object, default: null },
     panelUrl: { type: String, required: true },
 })
 
 const page = usePage()
+
+function money(value) {
+    return formatMoney(value, props.costs && props.costs.currency)
+}
 
 const breadcrumbs = [
     { title: 'WhatsApp Cloud', href: props.panelUrl },
@@ -172,6 +177,20 @@ watch(
                         <div class="text-lg font-semibold">{{ templates.length }}</div>
                         <div class="text-xs text-muted-foreground">Total</div>
                     </div>
+                </div>
+            </div>
+
+            <div v-if="costs" class="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border p-4">
+                <div class="flex items-baseline gap-2">
+                    <span class="text-sm text-muted-foreground">Gastos <span class="opacity-70">(estimado)</span> · mês atual</span>
+                    <span class="text-xl font-bold">{{ money(costs.total) }}</span>
+                    <span class="text-xs text-muted-foreground">{{ costs.conversations }} conversas</span>
+                </div>
+                <div class="flex flex-wrap gap-2 sm:ml-auto">
+                    <span v-for="c in costs.byCategory" :key="c.category" class="inline-flex items-center gap-1.5 text-sm">
+                        <span class="capitalize text-muted-foreground">{{ c.category.toLowerCase() }}</span>
+                        <b>{{ money(c.cost) }}</b>
+                    </span>
                 </div>
             </div>
 

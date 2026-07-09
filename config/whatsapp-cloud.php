@@ -100,6 +100,12 @@ return [
         // recommended.
         'gate' => env('WHATSAPP_CLOUD_PANEL_GATE'),
 
+        // ISO currency code for the estimated-cost card (e.g. 'BRL', 'USD').
+        // `conversation_analytics` returns the cost as a bare number in the
+        // account's billing currency; set this so the panel formats it. Null
+        // shows the plain number.
+        'currency' => env('WHATSAPP_CLOUD_PANEL_CURRENCY'),
+
         'ui_token' => env('WHATSAPP_CLOUD_PANEL_UI_TOKEN'),
     ],
 
