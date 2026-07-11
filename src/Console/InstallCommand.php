@@ -42,7 +42,7 @@ class InstallCommand extends Command
             'Register a number: fill whatsapp_numbers, or implement WhatsAppCredentials on your model and bind a resolver.',
             'Declare templates in config/whatsapp-cloud.php and create them on Meta with `php artisan whatsapp:template:create <name>`.',
             'Point Meta\'s webhook at /'.ltrim((string) config('whatsapp-cloud.webhook.prefix', 'webhooks/whatsapp/cloud'), '/').' and (optionally) listen to WhatsAppMessageReceived / WhatsAppStatusReceived.',
-            'Send: WhatsApp::for($tenant)->sendTemplate(\'key\', [...]);',
+            'Send: WhatsApp::for($tenant)->sendTemplate($to, TemplateMessage::make(\'key\', [...]));',
             $hasInertia
                 ? 'Template panel: run `npm run build`, then browse /'.$panelPrefix.' (guarded by the [web, auth] middleware; set WHATSAPP_CLOUD_PANEL_UI_TOKEN for extra defense).'
                 : 'Template panel (optional): require inertiajs/inertia-laravel + @inertiajs/vue3, then re-run install and `npm run build` to manage templates at /'.$panelPrefix.'.',
