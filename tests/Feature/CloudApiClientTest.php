@@ -114,6 +114,8 @@ it('throws a terminal CloudApiException on a closed session window (131047)', fu
         makeClient()->sendSessionText('5548333333333', 'oi');
     } catch (CloudApiException $e) {
         expect($e->errorCode)->toBe(131047)
+            ->and($e->isTerminal())->toBeTrue()
+            // The deprecated alias must keep answering the same thing.
             ->and($e->isTemporaryRestriction())->toBeTrue();
     }
 });
@@ -130,6 +132,7 @@ it('keeps unknown error codes retryable (not terminal)', function () {
         expect(false)->toBeTrue('expected CloudApiException');
     } catch (CloudApiException $e) {
         expect($e->errorCode)->toBe(80007)
+            ->and($e->isTerminal())->toBeFalse()
             ->and($e->isTemporaryRestriction())->toBeFalse();
     }
 });

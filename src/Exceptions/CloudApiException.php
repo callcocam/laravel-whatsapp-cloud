@@ -57,10 +57,9 @@ class CloudApiException extends WhatsAppException
 
     /**
      * Whether this is a terminal Meta error the caller should log and skip
-     * instead of letting the queue retry it (kept under the shared method name
-     * so callers stay provider-agnostic).
+     * instead of letting the queue retry it.
      */
-    public function isTemporaryRestriction(): bool
+    public function isTerminal(): bool
     {
         return $this->errorCode !== null && in_array($this->errorCode, self::TERMINAL_CODES, true);
     }
