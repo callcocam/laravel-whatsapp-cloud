@@ -130,10 +130,12 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         ], 'whatsapp-cloud-migrations');
 
         // The panel's Vue pages must be compiled by the host app's Vite build, so
-        // publish them into resources/js/Pages/ where the default Inertia page
-        // resolver (`resolvePageComponent('./Pages/**/*.vue')`) finds them.
+        // publish them into resources/js/pages/ where the Inertia page resolver
+        // of the Laravel starter kits (`resolvePageComponent('./pages/**/*.vue')`)
+        // finds them. Same destination the native scaffold writes to, so both
+        // panel modes land in one place.
         $this->publishes([
-            __DIR__.'/../resources/js/Pages/WhatsAppCloud' => resource_path('js/Pages/WhatsAppCloud'),
+            __DIR__.'/../resources/js/pages/WhatsAppCloud' => resource_path('js/pages/WhatsAppCloud'),
         ], 'whatsapp-cloud-inertia');
     }
 }

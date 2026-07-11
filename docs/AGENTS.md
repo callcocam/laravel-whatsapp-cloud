@@ -72,7 +72,7 @@ config/whatsapp-cloud.php        toda a configuração
 routes/webhook.php               GET|POST {webhook.prefix}
 routes/panel.php                 CRUD do painel sob {panel.prefix}
 database/migrations/             cria whatsapp_numbers
-resources/js/Pages/...           página Vue fallback (publicável)
+resources/js/pages/...           página Vue fallback (publicável)
 resources/stubs/inertia-native/  stubs shadcn-vue (scaffold)
 ```
 
@@ -245,16 +245,20 @@ use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;      // erro da Graph 
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppNotConfiguredException; // sem credenciais
 ```
 
-### ⚠️ Armadilha nº 2 — `isTemporaryRestriction()` significa **TERMINAL**
+### ⚠️ Armadilha nº 2 — `isTemporaryRestriction()` é um alias deprecado
 
-Apesar do nome, `isTemporaryRestriction() === true` quer dizer **"não adianta
-re-tentar"**. É o contrário do que o nome sugere.
+O método correto é **`isTerminal()`**: `true` = **não adianta re-tentar**.
+
+`isTemporaryRestriction()` ainda existe e devolve exatamente o mesmo valor, mas
+está **deprecado** — o nome dizia o oposto do comportamento. **Em código novo use
+`isTerminal()`**; se encontrar o nome antigo num app existente, ele não está
+quebrado, só desatualizado.
 
 ```php
 try {
     WhatsApp::for($team)->sendTemplate($to, TemplateMessage::make('assignment', $params));
 } catch (WhatsAppException $e) {
-    if ($e->isTemporaryRestriction()) {
+    if ($e->isTerminal()) {
         Log::warning('WhatsApp: erro terminal', ['e' => $e->getMessage()]);
         return; // NÃO re-tente — a fila não vai resolver
     }
@@ -393,16 +397,13 @@ Backend (controller + rotas + `TemplateManager`) é **sempre do pacote**. A
 
 | Modo | Comando | Destino |
 |---|---|---|
-| **Fallback autônoma** (CSS próprio, sem design system) | `vendor:publish --tag=whatsapp-cloud-inertia` | `resources/js/`**`Pages`**`/WhatsAppCloud/` |
-| **Scaffold nativo** (shadcn-vue, o host vira dono) | `php artisan whatsapp:panel:scaffold` | `resources/js/`**`pages`**`/WhatsAppCloud/` |
+| **Fallback autônoma** (CSS próprio, sem design system) | `vendor:publish --tag=whatsapp-cloud-inertia` | `resources/js/pages/WhatsAppCloud/` |
+| **Scaffold nativo** (shadcn-vue, o host vira dono) | `php artisan whatsapp:panel:scaffold` | `resources/js/pages/WhatsAppCloud/` |
 
-### ⚠️ Armadilha nº 3 — `Pages` vs `pages`
-
-Os dois modos gravam em diretórios com **caixa diferente** (`Pages/` no publish,
-`pages/` no scaffold), e no Linux isso são **pastas distintas**. Confira o glob do
-resolver do seu app (`resolvePageComponent('./pages/**/*.vue')` vs `'./Pages/...'`)
-e **use só o modo compatível**, senão o Inertia não acha o componente. Não misture
-os dois.
+Os dois gravam no **mesmo destino** (`resources/js/pages/`, minúsculo — o padrão
+dos starter kits do Laravel, cujo resolver é
+`resolvePageComponent('./pages/**/*.vue')`). Escolha **um** modo: rodar os dois
+sobrescreve o mesmo arquivo.
 
 ### Rotas (`whatsapp.cloud.panel.*`, sob `panel.prefix`)
 
@@ -515,7 +516,7 @@ Tags de publish: `whatsapp-cloud-config`, `whatsapp-cloud-migrations`,
 6. Aponte o webhook da Meta para `https://seu-app/{webhook.prefix}` e escute os
    eventos, se precisar.
 7. Envie **dentro de um Job**, capturando `WhatsAppException` e respeitando
-   `isTemporaryRestriction()` (= terminal).
+   `isTerminal()`.
 
 ## 13. Testes do próprio pacote
 
@@ -534,12 +535,13 @@ padrão de `tests/Feature/` (nunca bate na Meta de verdade).
 - [ ] `sendTemplate($to, TemplateMessage::make($key, $params))` — nunca
       `sendTemplate($key, $params)`.
 - [ ] Multi-tenant: `for($tenant)` **sempre com argumento** (`for()` pula o resolver).
-- [ ] `isTemporaryRestriction() === true` ⇒ **não re-tentar**.
+- [ ] `isTerminal() === true` ⇒ **não re-tentar** (`isTemporaryRestriction()` é
+      alias deprecado do mesmo valor).
 - [ ] Chave enviada existe no `templates` do config (senão `CloudApiException`).
 - [ ] `templateApi()` exige `waba_id` nas credenciais.
 - [ ] `WHATSAPP_CLOUD_APP_SECRET` setado, senão o webhook devolve 403 em tudo.
-- [ ] Painel: um só modo (publish **ou** scaffold), com a caixa do diretório
-      (`Pages`/`pages`) batendo com o resolver do app.
+- [ ] Painel: um só modo (publish **ou** scaffold) — ambos gravam em
+      `resources/js/pages/WhatsAppCloud/`.
 - [ ] Painel: `flash` compartilhado no `HandleInertiaRequests::share()`, e
       `panel.gate` definido.
 - [ ] Token nunca em código/commit/prop — só `.env` ou coluna encrypted.

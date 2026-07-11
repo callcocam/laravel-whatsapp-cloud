@@ -25,12 +25,36 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
   (`WHATSAPP_CLOUD_PANEL_CURRENCY`).
 
 ### Changed
+- **Panel pages now publish to `resources/js/pages/`** (lowercase), the path the
+  Laravel starter kits' Inertia resolver (`resolvePageComponent('./pages/**/*.vue')`)
+  scans — and the same destination `whatsapp:panel:scaffold` already wrote to. Both
+  panel modes finally land in one place. **Apps that published before this change**
+  have the old copy in `resources/js/Pages/WhatsAppCloud/`: delete it and re-run
+  `vendor:publish --tag=whatsapp-cloud-inertia` (on a case-insensitive filesystem
+  the two paths collide, so remove the stale one either way).
 - **Normalized success flash** — the panel controller emits
   `flash.toast = { type: 'success', message }` (the `send` action also sets
   `flash.sent_id`). The fallback page (which toasts client-side) is unaffected;
   native pages drive vue-sonner straight from the server flash.
 - `whatsapp:install` checklist and the composer `suggest` note now mention the
   native scaffold and the authorization gate.
+- `whatsapp:install` checklist printed a `sendTemplate('key', [...])` snippet that
+  did not match the real signature; it now shows
+  `sendTemplate($to, TemplateMessage::make('key', [...]))`.
+
+### Deprecated
+- **`WhatsAppException::isTemporaryRestriction()`** — renamed to
+  **`isTerminal()`**, which is what it actually answers: `true` means the error is
+  terminal and the caller must NOT retry. The old name said the opposite of its
+  behaviour. It stays as an alias delegating to `isTerminal()`, so existing callers
+  keep working; migrate at your convenience.
+
+### Documentation
+- Added [`docs/AGENTS.md`](docs/AGENTS.md) (integration reference for AI agents:
+  file map, exact signatures, contracts, invariants, pitfalls, anti-error checklist)
+  and [`docs/GUIA-DO-USUARIO.md`](docs/GUIA-DO-USUARIO.md) (end-user guide: Meta's
+  rules, where to find each credential, wiring the webhook, the panel, common
+  errors). The README routes readers to the right one.
 
 ## [0.1.0] - 2026-07-08
 

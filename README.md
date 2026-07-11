@@ -15,8 +15,8 @@ e eventos, e gestão de templates via Artisan.
   disparando eventos — sem regra de negócio dentro do pacote.
 - **Templates**: registry (config + runtime), comandos `whatsapp:template:*` e um
   **painel web** opcional (Inertia + Vue) pra criar/editar/enviar.
-- **Erros terminais** da Meta mapeados (`isTemporaryRestriction()`) pra você não
-  re-tentar o que não adianta (janela de 24h fechada, template pausado, etc.).
+- **Erros terminais** da Meta mapeados (`isTerminal()`) pra você não re-tentar o
+  que não adianta (janela de 24h fechada, template pausado, etc.).
 
 ## Documentação
 
@@ -97,12 +97,15 @@ use Callcocam\WhatsAppCloud\Exceptions\WhatsAppException;
 try {
     WhatsApp::for($team)->sendTemplate(...);
 } catch (WhatsAppException $e) {
-    if ($e->isTemporaryRestriction()) {
+    if ($e->isTerminal()) {
         // Terminal (janela fechada, template pausado…): logue e NÃO re-tente.
     }
     // Senão: deixe a fila re-tentar (rate limit, rede).
 }
 ```
+
+> `isTemporaryRestriction()` continua funcionando como **alias deprecado** de
+> `isTerminal()` — o nome antigo dizia o oposto do que o método faz.
 
 ### Templates
 
@@ -175,9 +178,11 @@ atualizar o pacote **não exige recopiar a página**.
    npm run build     # ou: npm run dev
    ```
 
-   O publish copia os componentes para `resources/js/Pages/WhatsAppCloud/`, onde o
-   resolver padrão do Inertia — `resolvePageComponent('./Pages/**/*.vue')` — os
-   encontra. Nada de CDN/assets do pacote: quem compila é o Vite do app.
+   O publish copia os componentes para `resources/js/pages/WhatsAppCloud/`, onde o
+   resolver dos starter kits do Laravel — `resolvePageComponent('./pages/**/*.vue')`
+   — os encontra. É o **mesmo destino** do scaffold nativo, então os dois modos do
+   painel caem no mesmo lugar. Nada de CDN/assets do pacote: quem compila é o Vite
+   do app.
 
 3. **Compartilhe o `flash`** no `HandleInertiaRequests::share()` para as
    mensagens de sucesso e o id da mensagem enviada aparecerem:
