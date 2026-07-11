@@ -18,6 +18,16 @@ e eventos, e gestão de templates via Artisan.
 - **Erros terminais** da Meta mapeados (`isTemporaryRestriction()`) pra você não
   re-tentar o que não adianta (janela de 24h fechada, template pausado, etc.).
 
+## Documentação
+
+Este README é a referência rápida. Para um passo a passo completo, escolha o guia
+pelo seu perfil:
+
+| Guia | Para quem | O que tem dentro |
+|---|---|---|
+| 🤖 **[Guia para agentes de IA](docs/AGENTS.md)** | Um agente (Claude Code, Copilot…) ou dev integrando o pacote | Mapa de arquivos, assinaturas exatas, contratos, invariantes, as 3 armadilhas do pacote, receita de integração e checklist anti-erro |
+| 👤 **[Guia do usuário](docs/GUIA-DO-USUARIO.md)** | Quem vai instalar, configurar e operar | Regras da Meta explicadas, onde achar cada credencial, ligar o webhook, criar templates, usar o painel e resolver os erros comuns |
+
 ## Requisitos
 
 - PHP `^8.3`
