@@ -373,7 +373,15 @@ php artisan whatsapp:template:send <nome> <to> ... # envia um template aprovado
 
 Todos aceitam `--tenant=` (contexto pro resolver). O `create` lê
 `config('whatsapp-cloud.definitions_path')/<nome>.php` (ou `--path=`), um arquivo
-que retorna `TemplateBuilder::...->toArray()`.
+que retorna `TemplateBuilder::...->toArray()`. A pasta **não vem pronta** —
+`definitions_path` é `null` por padrão; crie-a e aponte o config/env.
+
+**Não há comando de `edit` nem de `delete`**: para alterar ou apagar um template já
+criado, use o [painel](#painel-de-templates-inertia--vue) ou o `TemplateManager`.
+Re-rodar `create` com um nome+idioma que já existe falha na Meta. Detalhes do ciclo
+de vida (incl. a sincronia entre o arquivo de definição e o registry `templates`)
+no [guia de agentes](docs/AGENTS.md#9-a-pasta-de-definições-e-a-manutenção-dos-templates)
+e no [guia do usuário](docs/GUIA-DO-USUARIO.md#a-pasta-de-templates-para-quem-usa-o-terminal).
 
 ## Configuração
 

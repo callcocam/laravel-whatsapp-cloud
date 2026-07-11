@@ -387,7 +387,111 @@ desconhecido → `InvalidArgumentException`.
 
 ---
 
-## 9. Painel web (Inertia + Vue) — opcional
+## 9. A pasta de definições e a manutenção dos templates
+
+### ⚠️ Armadilha nº 3 — um template vive em DOIS lugares
+
+Não confunda os dois; eles servem a fases diferentes e **precisam ser mantidos em
+sincronia à mão**:
+
+| | Arquivo de definição | Registry (`config.templates`) |
+|---|---|---|
+| **Onde** | `{definitions_path}/<nome>.php` | `config('whatsapp-cloud.templates')` |
+| **Quando age** | Só no `whatsapp:template:create` (nasce na Meta) | Em **todo** `sendTemplate()` em runtime |
+| **Contém** | O conteúdo: texto, `{{n}}`, exemplos, botões | O mapeamento: chave do app → nome/idioma/**ordem dos params** |
+| **Se faltar** | Não dá pra criar o template pelo CLI | `CloudApiException: template not registered` |
+
+O invariante que quebra silenciosamente: **a ordem de `params` no registry tem que
+bater com a ordem dos `{{1}}, {{2}}…` no corpo da definição.** Se você trocar
+`{{1}}` e `{{2}}` no arquivo e esquecer o config, o pacote **não reclama** — manda
+o nome no lugar da data. Sempre revise os dois juntos.
+
+```php
+// 1) database/whatsapp-templates/coordena_lembrete.php  — o CONTEÚDO (vai pra Meta)
+return TemplateBuilder::make('coordena_lembrete', 'pt_BR', 'UTILITY')
+    ->body('Olá, {{1}}! Lembrete: {{2}} em {{3}}.', ['Maria', 'Reunião', '10/07'])
+    ->footer('Coordena')
+    ->toArray();
+
+// 2) config/whatsapp-cloud.php — o MAPEAMENTO (usado no envio)
+'templates' => [
+    'lembrete' => [                              // a chave que o app usa
+        'name'     => 'coordena_lembrete',       // == o name da definição
+        'language' => 'pt_BR',                   // == o language da definição
+        'category' => 'utility',
+        'params'   => ['nome', 'evento', 'data'], // MESMA ordem de {{1}},{{2}},{{3}}
+    ],
+],
+
+// 3) no app:
+WhatsApp::for($t)->sendTemplate($to, TemplateMessage::make('lembrete', [
+    'nome' => 'Maria', 'evento' => 'Reunião', 'data' => '10/07',
+]));
+```
+
+### Configurar a pasta (não vem pronta)
+
+`definitions_path` **é `null` por padrão** — sem configurar, `template:create`
+aborta com *"No definitions directory"*. O pacote não cria a pasta nem versiona os
+arquivos: o conteúdo é **do app**.
+
+```bash
+mkdir -p database/whatsapp-templates
+```
+
+```dotenv
+WHATSAPP_CLOUD_DEFINITIONS_PATH="${PWD}/database/whatsapp-templates"
+```
+
+Como o config lê um caminho cru, prefira resolvê-lo no PHP para não depender do
+diretório de trabalho:
+
+```php
+// config/whatsapp-cloud.php
+'definitions_path' => env('WHATSAPP_CLOUD_DEFINITIONS_PATH', database_path('whatsapp-templates')),
+```
+
+Um arquivo por template, nomeado **igual ao argumento do comando** (`<nome>.php` →
+`whatsapp:template:create <nome>`); por convenção use o mesmo nome do template na
+Meta. O arquivo **retorna um array** (via `TemplateBuilder::…->toArray()`) e deve
+ser **versionado no git** — é o histórico do que você submeteu.
+
+### Ciclo de vida (o que o CLI faz e o que NÃO faz)
+
+| Operação | CLI | Painel | API |
+|---|---|---|---|
+| Criar | `whatsapp:template:create` | ✅ | `TemplateManager::create()` |
+| Listar / ver | `whatsapp:template:list` / `:get` | ✅ | `all()` / `getByName()` |
+| Enviar | `whatsapp:template:send` | ✅ (teste) | `send()` |
+| **Editar** | ❌ **não existe comando** | ✅ | `TemplateManager::edit()` |
+| **Apagar** | ❌ **não existe comando** | ✅ | `TemplateManager::delete()` |
+
+**Para alterar um template já criado, o CLI não serve** — use o painel ou chame
+`TemplateManager::edit($id, $components, $category)` (o `$id` vem do
+`getByName()`). Re-rodar `template:create` com o mesmo nome+idioma **não** atualiza:
+a Meta rejeita, porque já existe.
+
+Fluxo de manutenção recomendado:
+
+1. Edite o arquivo de definição (é a fonte versionada).
+2. Aplique na Meta pelo painel, **ou** por um script/tinker:
+   ```php
+   $api  = WhatsApp::templateApi();
+   $id   = $api->getByName('coordena_lembrete')['id'];
+   $body = require database_path('whatsapp-templates/coordena_lembrete.php');
+   $api->edit($id, $body['components'], $body['category']);
+   ```
+3. Se mudou a **quantidade ou a ordem** das variáveis, atualize `params` no
+   registry **no mesmo commit**.
+4. Espere sair de `PENDING` (o `edit` reseta o template para nova análise — ele
+   **para de poder ser enviado** nesse meio-tempo).
+
+`name` e `language` **não são editáveis**. Mudar qualquer um dos dois = criar um
+template novo (e, se for o caso, apagar o antigo pelo painel).
+
+---
+
+## 10. Painel web (Inertia + Vue) — opcional
 
 As rotas **só existem** se `inertiajs/inertia-laravel` estiver instalado **e**
 `panel.enabled = true`. Quem só envia mensagem não carrega nada de frontend.
@@ -446,7 +550,7 @@ tenant `default`). Esse método é o gancho único para um seletor de tenant.
 
 ---
 
-## 10. Comandos Artisan
+## 11. Comandos Artisan
 
 ```bash
 php artisan whatsapp:install [--force]         # publica config + migration (+ páginas Vue se houver Inertia) e imprime checklist
@@ -461,6 +565,10 @@ php artisan whatsapp:template:send  <nome> <to> [params...] [--tenant=] [--lang=
 `ConfigCredentialsResolver` default ela é **ignorada** (sempre volta o `default`
 do config). Só tem efeito com um resolver que entenda a chave (ex.:
 `ModelCredentialsResolver`).
+
+**Não há comando de `edit` nem de `delete`** — para alterar/apagar um template já
+criado, use o painel ou o `TemplateManager` (veja a
+[§9](#9-a-pasta-de-definições-e-a-manutenção-dos-templates)).
 
 `template:create` lê `config('whatsapp-cloud.definitions_path')/<nome>.php` (ou
 `--path=`), um arquivo que **retorna um array**:
@@ -480,7 +588,7 @@ Tags de publish: `whatsapp-cloud-config`, `whatsapp-cloud-migrations`,
 
 ---
 
-## 11. Config e `.env`
+## 12. Config e `.env`
 
 | Chave | Env | Default |
 |---|---|---|
@@ -503,7 +611,7 @@ Tags de publish: `whatsapp-cloud-config`, `whatsapp-cloud-migrations`,
 
 ---
 
-## 12. Receita de integração (ordem exata)
+## 13. Receita de integração (ordem exata)
 
 1. `composer require callcocam/laravel-whatsapp-cloud` (repo VCS privado — veja o
    README).
@@ -518,7 +626,7 @@ Tags de publish: `whatsapp-cloud-config`, `whatsapp-cloud-migrations`,
 7. Envie **dentro de um Job**, capturando `WhatsAppException` e respeitando
    `isTerminal()`.
 
-## 13. Testes do próprio pacote
+## 14. Testes do próprio pacote
 
 ```bash
 composer test        # pint --test + phpstan (larastan) + pest
@@ -530,7 +638,7 @@ padrão de `tests/Feature/` (nunca bate na Meta de verdade).
 
 ---
 
-## 14. Checklist anti-erro (revise antes de dar o trabalho por pronto)
+## 15. Checklist anti-erro (revise antes de dar o trabalho por pronto)
 
 - [ ] `sendTemplate($to, TemplateMessage::make($key, $params))` — nunca
       `sendTemplate($key, $params)`.
@@ -538,6 +646,13 @@ padrão de `tests/Feature/` (nunca bate na Meta de verdade).
 - [ ] `isTerminal() === true` ⇒ **não re-tentar** (`isTemporaryRestriction()` é
       alias deprecado do mesmo valor).
 - [ ] Chave enviada existe no `templates` do config (senão `CloudApiException`).
+- [ ] Mexeu no corpo de uma definição? A ordem de `params` no registry ainda bate
+      com os `{{1}}, {{2}}…` do arquivo (dessincronizar **não gera erro** — só
+      manda o valor errado).
+- [ ] `definitions_path` configurado antes de usar `whatsapp:template:create`
+      (o default é `null`).
+- [ ] Editar template = painel ou `TemplateManager::edit()`. Re-rodar
+      `template:create` com nome+idioma existente **falha** na Meta.
 - [ ] `templateApi()` exige `waba_id` nas credenciais.
 - [ ] `WHATSAPP_CLOUD_APP_SECRET` setado, senão o webhook devolve 403 em tudo.
 - [ ] Painel: um só modo (publish **ou** scaffold) — ambos gravam em

@@ -194,6 +194,55 @@ A Meta pode **reclassificar** sua categoria por conta própria.
 Veja a próxima seção. Se preferir o terminal, veja a
 [seção 8](#8-comandos-do-terminal).
 
+### A pasta de templates (para quem usa o terminal)
+
+Se você cria templates pelo **painel**, pode pular esta parte — ele não usa pasta
+nenhuma.
+
+Pelo **terminal**, cada template é um arquivo `.php` numa pasta do seu projeto. Ela
+**não vem pronta**: você cria e diz onde fica.
+
+```bash
+mkdir -p database/whatsapp-templates
+```
+
+```dotenv
+# .env
+WHATSAPP_CLOUD_DEFINITIONS_PATH="${PWD}/database/whatsapp-templates"
+```
+
+Sem isso, o comando de criar reclama: *"No definitions directory"*.
+
+Cada arquivo tem o nome do template (`coordena_lembrete.php` →
+`whatsapp:template:create coordena_lembrete`) e descreve o conteúdo dele. **Guarde
+esses arquivos no git**: são o histórico do que você mandou para a Meta, e a única
+cópia do texto que fica do seu lado.
+
+### ⚠️ O template mora em dois lugares — mantenha os dois em sincronia
+
+Isto pega muita gente:
+
+| | Onde | Para quê |
+|---|---|---|
+| **O arquivo da pasta** | `database/whatsapp-templates/…php` | O **conteúdo** — o texto que vai para a Meta ser aprovado |
+| **O `config/whatsapp-cloud.php`** | seção `templates` | O **mapa** — diz ao app qual variável preenche o `{{1}}`, o `{{2}}`… |
+
+Se você mudar a **ordem das variáveis** no texto e esquecer de ajustar o config, o
+sistema **não dá erro**: ele simplesmente manda o nome da pessoa onde deveria ir a
+data. Sempre confira os dois juntos. (A parte do config é tarefa de quem programa.)
+
+### Como ALTERAR um template que já existe
+
+**Não dá para "recriar"**: se você rodar o comando de criar de novo com o mesmo
+nome e idioma, a Meta recusa, porque ele já existe.
+
+Para mudar o texto de um template, use o **painel** (botão *Editar*) — é o único
+lugar com essa função pronta. O terminal só cria, lista, consulta e envia.
+
+E lembre: **editar joga o template de volta para análise** (`PENDING`), então ele
+para de poder ser enviado até a Meta reaprovar. Nome e idioma nunca mudam — para
+trocar um dos dois, crie um template novo e apague o velho.
+
 ---
 
 ## 7. O painel web
@@ -261,6 +310,9 @@ php artisan whatsapp:template:send coordena_lembrete 5548999999999 Maria "Reuni�
 
 Todos aceitam `--tenant=` para escolher o número/cliente (quando o app é
 multi-tenant), e o `send` aceita `--lang=` (padrão `pt_BR`).
+
+> **Não existe comando para editar nem para apagar** template. Essas duas ações só
+> estão no [painel](#7-o-painel-web).
 
 O `create` lê um arquivo `<nome>.php` da pasta configurada em
 `definitions_path`. O arquivo é assim:
