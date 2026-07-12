@@ -27,6 +27,14 @@ abstract class TestCase extends Orchestra
 
     protected function defineEnvironment($app): void
     {
+        // Pin the things testbench.yaml also sets. That file exists so the package
+        // can be RUN (`testbench serve` / `tinker`), and Testbench reads it here
+        // too — without these, the dev skeleton's sandbox driver and on-disk
+        // database would leak into every test.
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('cache.default', 'array');
+        $app['config']->set('whatsapp-cloud.driver', 'cloud');
+
         // The template panel runs under the `web` middleware group, which
         // encrypts cookies and needs a valid key.
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));

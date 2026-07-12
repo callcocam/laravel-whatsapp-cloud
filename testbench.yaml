@@ -1,0 +1,30 @@
+# Lets the package be run, not just tested.
+#
+#   vendor/bin/testbench serve      → the sandbox screen at /whatsapp/cloud/sandbox
+#   vendor/bin/testbench tinker     → drive the sandbox from the REPL
+#
+# The driver is `sandbox` here, so nothing this skeleton does can reach Meta.
+
+providers:
+  - Callcocam\WhatsAppCloud\WhatsAppCloudServiceProvider
+
+migrations:
+  - database/migrations
+
+env:
+  - APP_KEY="base64:2fl+Ktv0kdWtQ2QG/Y7g5+Q0Bx0iQ0kY8Yx0iQ0kY8="
+  - DB_CONNECTION=sqlite
+  # A file, not :memory: — `serve` is a separate process from `tinker`, and a
+  # conversation you set up in one should still be there in the other.
+  - DB_DATABASE=workbench/database.sqlite
+  - QUEUE_CONNECTION=sync
+  # The sandbox caches a template's body when it has to fall back to Meta. Keep it
+  # in memory so this skeleton needs no cache table.
+  - CACHE_STORE=array
+
+  - WHATSAPP_CLOUD_DRIVER=sandbox
+  - WHATSAPP_CLOUD_APP_SECRET=local-sandbox-secret
+  - WHATSAPP_CLOUD_VERIFY_TOKEN=local-verify-token
+  - WHATSAPP_CLOUD_PHONE_NUMBER_ID=111222333
+  - WHATSAPP_CLOUD_ACCESS_TOKEN=local-token
+  - WHATSAPP_CLOUD_WABA_ID=999888777

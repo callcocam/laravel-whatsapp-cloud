@@ -5,6 +5,30 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 ## [Unreleased]
 
 ### Added
+- **Sandbox** — a simulator that replaces the wire to Meta, so a whole conversation
+  (including a handoff to a human operator) can be rehearsed without a phone, and
+  **before a template is ever submitted**. See [docs/SANDBOX.md](docs/SANDBOX.md).
+  - `whatsapp-cloud.driver` (env `WHATSAPP_CLOUD_DRIVER`): `cloud` (default) or `sandbox`.
+    The app's code does not change — only the transport does.
+  - Replies are signed with the real HMAC and delivered through the REAL webhook
+    route, so the app's listeners run exactly as they do in production.
+  - Meta's 24h session window is enforced for real: outside it, only a template gets
+    through; free text comes back as a terminal `131047`. It can be closed on demand
+    rather than waited out.
+  - Fault injection for the errors that actually bite, including **retryable** ones —
+    they are what exercises the queue's backoff, the branch the happy path never touches.
+  - The template body is resolved from the LOCAL definition file, falling back to Meta.
+    That is what lets a template be rehearsed before `whatsapp:template:create` burns
+    its name (which is one-way).
+  - A WhatsApp-looking screen at `/whatsapp/cloud/sandbox` with an inspector showing the
+    exact envelope, the exact webhook, the signature, the listeners, and any exception a
+    listener threw.
+  - Refuses to boot in production, and the screen does not register unless the driver is
+    already `sandbox`.
+- **`MessageTransport` contract** — the single seam every outbound message passes
+  through, for both the data plane (`CloudApiClient`) and the panel's template
+  test-send (`TemplateManager::send`). Additive: the constructors gained an optional
+  trailing parameter, so nothing existing breaks.
 - Template management panel (Inertia + Vue): create/list/edit/delete/send with a
   WhatsApp-style live preview, published via `vendor:publish --tag=whatsapp-cloud-inertia`.
 - **Configurable panel component** — `panel.component` (env `WHATSAPP_CLOUD_PANEL_COMPONENT`)

@@ -46,8 +46,11 @@ src/
   Facades/WhatsApp.php           facade → WhatsAppManager
   Contracts/
     MessageGateway.php           interface do data plane (CloudApiClient implementa)
+    MessageTransport.php         O FIO. Todo envio passa por aqui — o driver escolhe qual
     WhatsAppCredentials.php      phoneNumberId() accessToken() wabaId() graphVersion()
     WhatsAppCredentialsResolver.php   resolve(mixed $context): ?WhatsAppCredentials
+  Transport/
+    CloudApiTransport.php        o fio real (HTTP → Graph API). Default.
   Support/
     ArrayCredentials.php         credenciais de array (usado pelo config `default`)
     ConfigCredentialsResolver.php     resolver default (ignora o contexto)
@@ -65,14 +68,26 @@ src/
     InteractiveMessage.php       body + options
     SendResult.php               provider / messageId (wamid) / status
   Events/                        WhatsAppMessageReceived, WhatsAppStatusReceived, WhatsAppWebhookVerified
-  Exceptions/                    WhatsAppException (base), CloudApiException, WhatsAppNotConfiguredException
-  Http/Controllers/              WebhookController, TemplatePanelController
+  Exceptions/                    WhatsAppException (base), CloudApiException, WhatsAppNotConfiguredException, SandboxException
+  Http/Controllers/              WebhookController, TemplatePanelController, SandboxController
+  Sandbox/                       SÓ com driver=sandbox. Ver docs/SANDBOX.md
+    SandboxTransport.php         o fio que não vai a lugar nenhum: guarda a mensagem
+    InboundPayloadFactory.php    monta os webhooks no formato da Meta (o produto)
+    WebhookSimulator.php         assina com HMAC real e entrega pela rota REAL
+    TemplateDefinitions.php      lê os arquivos de definição locais
+    TemplateResolver.php         corpo do template: definição local → Meta → degrada
+    ResolvedTemplate.php         components → header/body/footer/buttons + render({{n}})
+    Sandbox.php                  a API: participant() / reply() / tapTemplateButton() / …
+    Fault.php, FaultCatalog.php  as falhas da Meta que dá pra injetar
+    Models/                      SandboxConversation, SandboxMessage
   Console/                       install, panel:scaffold, template:{list,get,create,send}
 config/whatsapp-cloud.php        toda a configuração
 routes/webhook.php               GET|POST {webhook.prefix}
 routes/panel.php                 CRUD do painel sob {panel.prefix}
-database/migrations/             cria whatsapp_numbers
-resources/js/pages/...           página Vue fallback (publicável)
+routes/sandbox.php               a tela do sandbox (só com driver=sandbox, nunca em produção)
+database/migrations/             cria whatsapp_numbers + as tabelas do sandbox (tags separadas)
+resources/js/pages/...           página Vue fallback do painel (publicável)
+resources/js/sandbox/...         página Vue do sandbox — FORA de js/pages de propósito
 resources/stubs/inertia-native/  stubs shadcn-vue (scaffold)
 ```
 
@@ -311,6 +326,51 @@ Event::listen(function (WhatsAppStatusReceived $e) {
 
 Para registrar as rotas você mesmo: `whatsapp-cloud.webhook.enabled = false` e
 aponte para `WebhookController::verify` / `::store`.
+
+---
+
+## 7b. Sandbox — testar o fluxo inteiro sem a Meta
+
+Guia completo: **[docs/SANDBOX.md](SANDBOX.md)**. O que um agente precisa saber:
+
+`whatsapp-cloud.driver` escolhe o fio por onde toda mensagem sai:
+
+| driver | |
+|---|---|
+| `cloud` (default) | `CloudApiTransport` → a Graph API de verdade |
+| `sandbox` | `SandboxTransport` → guarda a mensagem; **nada chega à Meta** |
+
+**O código do app não muda.** Continua `WhatsApp::for()->sendTemplate(...)`, continua
+recebendo `WhatsAppMessageReceived`. As respostas do sandbox entram pela **rota de
+webhook real**, assinadas com o **HMAC real** — os listeners rodam como em produção.
+
+O corpo do template vem do **arquivo de definição local**, não da Meta. Logo, dá pra
+ensaiar um template **antes de submetê-lo** — e `create` é one-way.
+
+```php
+$sandbox = app(Callcocam\WhatsAppCloud\Sandbox\Sandbox::class);
+
+$maria = $sandbox->participant('5548999999999', 'Maria', 'customer');
+$sandbox->reply($maria, 'Confirmo!');                     // abre a janela de 24h
+$sandbox->tapTemplateButton($maria, 'Aceitar', $wamid);   // webhook type:button
+$maria->closeWindow();                                    // → o próximo texto livre estoura 131047
+$maria->arm('rate_limited');                              // → o próximo envio estoura 80007 (retentável)
+```
+
+O operador/responsável **não tem maquinaria própria**: é outro participante. Dois
+chats, um motor.
+
+### ⚠️ O driver vem do `.env`. NUNCA de um toggle em runtime
+
+Se um listener enfileira, o envio sai num **worker** — outro processo, que lê o
+próprio `.env`. Um driver trocado em runtime **não chega lá**, e a mensagem vai pra
+Meta de verdade, pra um número real, cobrando.
+
+Ligar: `WHATSAPP_CLOUD_DRIVER=sandbox` no `.env`, depois `config:clear` **e**
+`queue:restart`.
+
+O `SandboxTransport` se recusa a bootar em produção (sem override), e a tela não se
+registra com o driver `cloud`.
 
 ---
 

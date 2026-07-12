@@ -27,6 +27,7 @@ pelo seu perfil:
 |---|---|---|
 | 🤖 **[Guia para agentes de IA](docs/AGENTS.md)** | Um agente (Claude Code, Copilot…) ou dev integrando o pacote | Mapa de arquivos, assinaturas exatas, contratos, invariantes, as 3 armadilhas do pacote, receita de integração e checklist anti-erro |
 | 👤 **[Guia do usuário](docs/GUIA-DO-USUARIO.md)** | Quem vai instalar, configurar e operar | Regras da Meta explicadas, onde achar cada credencial, ligar o webhook, criar templates, usar o painel e resolver os erros comuns |
+| 🧪 **[Sandbox](docs/SANDBOX.md)** | Quem vai testar um fluxo antes de soltar | Ensaiar a conversa inteira — inclusive o handoff pro responsável — sem um celular e **antes de submeter o template à Meta**. Janela de 24h e falhas da Meta de verdade. |
 
 ## Requisitos
 
@@ -386,9 +387,32 @@ e no [guia do usuário](docs/GUIA-DO-USUARIO.md#a-pasta-de-templates-para-quem-u
 ## Configuração
 
 Veja [`config/whatsapp-cloud.php`](config/whatsapp-cloud.php): `graph_version`,
-`app_secret`, `verify_token`, `default` (creds dev), `webhook`, `panel`
-([painel de templates](#painel-de-templates-inertia--vue)), `model`, `templates`,
-`definitions_path`.
+`driver` ([sandbox](docs/SANDBOX.md)), `app_secret`, `verify_token`, `default`
+(creds dev), `webhook`, `panel`
+([painel de templates](#painel-de-templates-inertia--vue)), `sandbox`, `model`,
+`templates`, `definitions_path`.
+
+## Sandbox
+
+Testar um fluxo hoje significa mandar mensagem pra um número real e ficar com o
+celular na mão. O sandbox troca o fio que vai pra Meta por um simulador: você encena
+a conversa inteira numa tela com cara de WhatsApp — inclusive o handoff pro
+responsável — e os listeners do seu app rodam **de verdade**, porque as respostas
+entram pela rota de webhook real, assinadas com o HMAC real.
+
+```dotenv
+WHATSAPP_CLOUD_DRIVER=sandbox
+```
+
+O código do app **não muda**. E o corpo do template vem do arquivo de definição
+local, então dá pra fechar o texto, os botões e o fluxo **antes de submeter o
+template à Meta** — o que importa, porque `whatsapp:template:create` é one-way.
+
+A janela de 24h é real (fora dela só template passa, e texto livre volta como
+`131047`), e as falhas da Meta podem ser injetadas — inclusive as retentáveis, que
+são as que exercitam o backoff da sua fila.
+
+→ **[Guia do sandbox](docs/SANDBOX.md)**
 
 ## Testes
 

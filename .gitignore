@@ -8,3 +8,4 @@ composer.lock
 /.vscode
 .phpstan.cache
 /whatsapp-cloud-templates
+/workbench

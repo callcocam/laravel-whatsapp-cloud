@@ -20,8 +20,9 @@ o [Guia para agentes de IA](AGENTS.md).
 7. [O painel web](#7-o-painel-web)
 8. [Comandos do terminal](#8-comandos-do-terminal)
 9. [Enviando mensagens pelo app](#9-enviando-mensagens-pelo-app)
-10. [Problemas comuns](#10-problemas-comuns)
-11. [Glossário](#11-glossário)
+10. [Testar sem mandar mensagem pra ninguém (sandbox)](#10-testar-sem-mandar-mensagem-pra-ninguém-sandbox)
+11. [Problemas comuns](#11-problemas-comuns)
+12. [Glossário](#12-glossário)
 
 ---
 
@@ -353,7 +354,49 @@ de nome, o código do app não muda.
 
 ---
 
-## 10. Problemas comuns
+## 10. Testar sem mandar mensagem pra ninguém (sandbox)
+
+Até aqui, testar um fluxo significava mandar mensagem pra um número real e ficar com o
+celular na mão. O **sandbox** troca o fio que vai pra Meta por um simulador.
+
+```dotenv
+WHATSAPP_CLOUD_DRIVER=sandbox
+```
+
+```bash
+php artisan vendor:publish --tag=whatsapp-cloud-sandbox-migrations
+php artisan vendor:publish --tag=whatsapp-cloud-sandbox
+php artisan migrate && npm run build
+php artisan config:clear && php artisan queue:restart
+```
+
+Abra **`/whatsapp/cloud/sandbox`**. Você encena a conversa numa tela com cara de WhatsApp:
+o app dispara o template, você responde como o cliente, toca nos botões — e os
+listeners do seu app **rodam de verdade**, porque as respostas entram pela rota de
+webhook real, assinadas.
+
+**O que isso destrava, que antes não dava:**
+
+- **Ensaiar um template antes de mandar pra Meta.** O corpo vem do arquivo de definição
+  local. Como `whatsapp:template:create` é one-way (não dá pra reenviar o mesmo nome),
+  é aqui que você fecha o texto e os botões antes de queimar o nome.
+- **Testar o handoff pro responsável.** O operador é só outro participante, com o chat
+  dele. Cliente → sistema → operador → cliente, os três lado a lado.
+- **Fechar a janela de 24h na hora**, em vez de esperar um dia, e ver se o app trata o
+  `131047`.
+- **Injetar as falhas da Meta** — inclusive as retentáveis, que são as que exercitam o
+  backoff da sua fila.
+
+> ⚠️ **O `WHATSAPP_CLOUD_DRIVER` tem que estar no `.env`.** Se um listener seu enfileira,
+> o envio sai num *worker* — outro processo, que lê o próprio `.env`. Por isso o
+> `config:clear` e o `queue:restart` fazem parte do ritual. O sandbox se recusa a rodar
+> em produção.
+
+→ **[Guia completo do sandbox](SANDBOX.md)**
+
+---
+
+## 11. Problemas comuns
 
 **"Não consigo verificar o webhook na Meta."**
 O `WHATSAPP_CLOUD_VERIFY_TOKEN` do `.env` está diferente do que você digitou no
@@ -399,7 +442,7 @@ rodar `npm run build` depois de publicar as páginas.
 
 ---
 
-## 11. Glossário
+## 12. Glossário
 
 | Termo | O que é |
 |---|---|
