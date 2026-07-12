@@ -1,5 +1,6 @@
 <?php
 
+use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Facades\WhatsApp;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
@@ -165,4 +166,105 @@ it('advances the delivery status, firing the real status webhook', function () {
     ])->assertRedirect();
 
     expect($message->refresh()->delivery_status)->toBe('read');
+});
+
+/**
+ * Reply BUTTONS — the shape the package's own sendInteractive() never produces
+ * (it always builds a list), and which therefore went untested until a host app
+ * built the envelope itself and posted it through the transport.
+ *
+ * The screen used to read only `action.sections.0.rows`, so a message offering
+ * buttons rendered with no buttons at all: the conversation dead-ended on the
+ * very message that asked a question.
+ */
+function sendButtons(string $to = '5548999999999'): SandboxMessage
+{
+    // The person speaks first — otherwise the 24h window is shut and an interactive
+    // message is (correctly) refused with 131047. Buttons are always an ANSWER.
+    app(Sandbox::class)->reply(app(Sandbox::class)->participant($to, 'Maria'), 'oi');
+
+    app(MessageTransport::class)->postMessage(WhatsApp::credentials(), [
+        'messaging_product' => 'whatsapp',
+        'to' => $to,
+        'type' => 'interactive',
+        'interactive' => [
+            'type' => 'button',
+            'body' => ['text' => 'Quer fazer outro lançamento?'],
+            'action' => ['buttons' => [
+                ['type' => 'reply', 'reply' => ['id' => '1', 'title' => 'Novo lançamento']],
+                ['type' => 'reply', 'reply' => ['id' => '2', 'title' => 'Encerrar']],
+            ]],
+        ],
+    ]);
+
+    return SandboxMessage::where('direction', SandboxMessage::OUTBOUND)->sole();
+}
+
+it('makes the reply buttons of an interactive message tappable', function () {
+    $message = sendButtons();
+
+    $options = $this->getJson('whatsapp/cloud/sandbox/state?conversation='.$message->conversation_id)
+        ->assertOk()
+        ->json('messages.1.options');
+
+    expect($options)->toBe([
+        ['id' => '1', 'title' => 'Novo lançamento', 'kind' => 'button'],
+        ['id' => '2', 'title' => 'Encerrar', 'kind' => 'button'],
+    ]);
+});
+
+it('turns a tapped reply button into the interactive.button_reply webhook', function () {
+    $seen = null;
+    Event::listen(WhatsAppMessageReceived::class, function ($event) use (&$seen) {
+        $seen = $event->message;
+    });
+
+    $message = sendButtons();
+
+    $this->post('whatsapp/cloud/sandbox/tap', [
+        'conversation' => $message->conversation_id,
+        'kind' => 'button',
+        'id' => '1',
+        'text' => 'Novo lançamento',
+        'reply_to' => $message->wamid,
+    ])->assertRedirect();
+
+    // NOT type:button — that one is a template button. An app that handles only
+    // one of the two shapes ignores the other in silence.
+    expect($seen['type'])->toBe('interactive')
+        ->and($seen['interactive']['type'])->toBe('button_reply')
+        ->and($seen['interactive']['button_reply'])->toBe(['id' => '1', 'title' => 'Novo lançamento'])
+        ->and($seen['context']['id'])->toBe($message->wamid);
+});
+
+it('makes every row tappable, not just the first section', function () {
+    app(Sandbox::class)->reply(app(Sandbox::class)->participant('5548999999999', 'Maria'), 'oi');
+
+    app(MessageTransport::class)->postMessage(WhatsApp::credentials(), [
+        'messaging_product' => 'whatsapp',
+        'to' => '5548999999999',
+        'type' => 'interactive',
+        'interactive' => [
+            'type' => 'list',
+            'body' => ['text' => 'Escolha a categoria:'],
+            'action' => [
+                'button' => 'Ver categorias',
+                'sections' => [
+                    ['title' => 'Saídas', 'rows' => [['id' => '1', 'title' => 'Alimentação']]],
+                    ['title' => 'Entradas', 'rows' => [['id' => '2', 'title' => 'Salário']]],
+                ],
+            ],
+        ],
+    ]);
+
+    $message = SandboxMessage::where('direction', SandboxMessage::OUTBOUND)->sole();
+
+    $options = $this->getJson('whatsapp/cloud/sandbox/state?conversation='.$message->conversation_id)
+        ->json('messages.1.options');
+
+    // The second section used to vanish: only the first one's rows were tappable.
+    expect($options)->toBe([
+        ['id' => '1', 'title' => 'Alimentação', 'kind' => 'list'],
+        ['id' => '2', 'title' => 'Salário', 'kind' => 'list'],
+    ]);
 });

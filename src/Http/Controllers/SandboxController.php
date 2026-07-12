@@ -95,10 +95,13 @@ class SandboxController
         $conversation = $this->conversation($request);
         $replyTo = (string) $request->input('reply_to');
         $text = (string) $request->input('text');
+        $id = (string) $request->input('id');
 
-        return $this->run(fn () => $request->input('kind') === 'list'
-            ? $this->sandbox->pickListRow($conversation, (string) $request->input('id'), $text, $replyTo)
-            : $this->sandbox->tapTemplateButton($conversation, $text, $replyTo));
+        return $this->run(fn () => match ($request->input('kind')) {
+            'list' => $this->sandbox->pickListRow($conversation, $id, $text, $replyTo),
+            'button' => $this->sandbox->tapReplyButton($conversation, $id, $text, $replyTo),
+            default => $this->sandbox->tapTemplateButton($conversation, $text, $replyTo),
+        });
     }
 
     /**
@@ -276,14 +279,11 @@ class SandboxController
                 'source' => $template->source,
             ],
 
-            // The interactive list, so its rows can be tapped.
-            'options' => array_values(array_map(
-                static fn ($row): array => [
-                    'id' => (string) data_get($row, 'id'),
-                    'title' => (string) data_get($row, 'title'),
-                ],
-                (array) data_get($message->envelope, 'interactive.action.sections.0.rows', []),
-            )),
+            // The interactive options, so they can be tapped. Each carries the KIND
+            // of webhook its tap must produce — a reply button is button_reply, a
+            // list row is list_reply, and an app that only handles one of them is
+            // exactly what the sandbox exists to catch.
+            'options' => $this->interactiveOptions((array) $message->envelope),
 
             'warnings' => array_values(array_filter([
                 $message->meta['param_count_mismatch'] ?? null,
@@ -297,6 +297,46 @@ class SandboxController
 
             'listeners' => $message->meta['listeners'] ?? [],
         ];
+    }
+
+    /**
+     * The tappable options of an outbound interactive message, in the order Meta
+     * would show them.
+     *
+     * Both shapes live under `interactive.action`, and they are NOT the same
+     * message: reply buttons come back as `button_reply`, list rows as
+     * `list_reply`. Reading only one of them (as this did) leaves the other half
+     * of the API untappable — the screen renders a menu with no menu, and the
+     * conversation dead-ends on the very message that offered a choice.
+     *
+     * A list may carry several sections; every row of every one of them is a row.
+     *
+     * @param  array<string, mixed>  $envelope
+     * @return array<int, array{id: string, title: string, kind: string}>
+     */
+    private function interactiveOptions(array $envelope): array
+    {
+        $options = [];
+
+        foreach ((array) data_get($envelope, 'interactive.action.buttons', []) as $button) {
+            $options[] = [
+                'id' => (string) data_get($button, 'reply.id'),
+                'title' => (string) data_get($button, 'reply.title'),
+                'kind' => 'button',
+            ];
+        }
+
+        foreach ((array) data_get($envelope, 'interactive.action.sections', []) as $section) {
+            foreach ((array) data_get($section, 'rows', []) as $row) {
+                $options[] = [
+                    'id' => (string) data_get($row, 'id'),
+                    'title' => (string) data_get($row, 'title'),
+                    'kind' => 'list',
+                ];
+            }
+        }
+
+        return $options;
     }
 
     private function conversation(Request $request): SandboxConversation

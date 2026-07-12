@@ -70,6 +70,25 @@ class Sandbox
     }
 
     /**
+     * The person taps a reply button on an INTERACTIVE message. Comes back as
+     * `interactive.button_reply` — a different shape from a template button, and
+     * the one an app gets whenever it sends buttons itself instead of a template.
+     */
+    public function tapReplyButton(
+        SandboxConversation $conversation,
+        string $id,
+        string $title,
+        string $replyTo,
+    ): SimulatedWebhook {
+        return $this->deliver(
+            $conversation,
+            $this->factory($conversation)->buttonReply($id, $title, $replyTo),
+            type: 'interactive',
+            rendered: $title,
+        );
+    }
+
+    /**
      * The person picks a row from an interactive list — what sendInteractive()
      * provokes.
      */

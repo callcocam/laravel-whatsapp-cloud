@@ -4,6 +4,17 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Fixed
+- **Sandbox: interactive reply buttons are tappable.** The screen only read
+  `interactive.action.sections.0.rows`, so a message carrying reply BUTTONS rendered
+  with no buttons at all and the rehearsal dead-ended on the very message that asked
+  a question. The blind spot had a cause: the package's own `sendInteractive()` always
+  builds a list, so the button shape was never exercised — only an app that builds its
+  own envelope (to choose the option ids) sends one. `Sandbox::tapReplyButton()` now
+  fires the `interactive.button_reply` webhook that `InboundPayloadFactory` could
+  already produce but nothing called. A list with several sections also lost every row
+  after the first section; all of them are tappable now.
+
 ### Added
 - **Sandbox** — a simulator that replaces the wire to Meta, so a whole conversation
   (including a handoff to a human operator) can be rehearsed without a phone, and

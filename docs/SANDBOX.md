@@ -90,6 +90,11 @@ silêncio — e o sandbox é onde isso aparece:
 Todos carregam `context.id` — o wamid da mensagem respondida. **Sem ele não há como saber o que foi
 respondido**, e é isso que amarra o handoff.
 
+Na tela, cada opção da bolha já sabe qual dos três webhooks ela dispara: clicar num botão interativo
+manda `button_reply`, numa linha de lista manda `list_reply`. Nada disso depende de o app usar o
+`sendInteractive()` do pacote — ele só monta LISTA, e um app que monta o próprio envelope de botões
+(porque precisa escolher os ids das opções) é atendido igual.
+
 > `button.payload === button.text`. A Meta só deixa escolher o payload quando o envio manda
 > `components[{type: button, sub_type: quick_reply, parameters: [{type: payload}]}]` — coisa que este pacote
 > nunca faz. Codar contra um payload diferente seria codar contra uma mensagem que produção não manda.
@@ -218,7 +223,9 @@ $suporte = $sandbox->participant('5548911111111', 'Suporte', 'operator');
 WhatsApp::for()->sendTemplate($maria->wa_id, TemplateMessage::make('assignment', [...]));
 
 // A pessoa responde. O webhook entra pela rota real, assinado, e seus listeners rodam.
-$sandbox->tapTemplateButton($maria, 'Aceitar', $wamid);
+$sandbox->tapTemplateButton($maria, 'Aceitar', $wamid);   // → type: button
+$sandbox->tapReplyButton($maria, '1', 'Novo lançamento', $wamid); // → interactive.button_reply
+$sandbox->pickListRow($maria, '2', 'Alimentação', $wamid);        // → interactive.list_reply
 $sandbox->reply($suporte, 'Aprovado');
 
 // Ensaiar o que dá errado.

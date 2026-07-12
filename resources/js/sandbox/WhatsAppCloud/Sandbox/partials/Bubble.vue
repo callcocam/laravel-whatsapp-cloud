@@ -41,8 +41,10 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
 
             <div v-if="message.template?.footer" class="b-footer">{{ message.template.footer }}</div>
 
-            <!-- Tapping fires the webhook Meta would fire: a template button comes
-                 back as type:button, a list row as interactive.list_reply. -->
+            <!-- Tapping fires the webhook Meta would fire — and each shape is a
+                 DIFFERENT webhook: a template button comes back as type:button, an
+                 interactive button as interactive.button_reply, a list row as
+                 interactive.list_reply. That is why each option carries its kind. -->
             <div v-if="buttons.length" class="bubble-buttons" @click.stop>
                 <button
                     v-for="button in buttons"
@@ -62,7 +64,7 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
                     :key="option.id"
                     class="bb"
                     :disabled="!canTap"
-                    @click="emit('tap', { kind: 'list', id: option.id, text: option.title, reply_to: message.wamid })"
+                    @click="emit('tap', { kind: option.kind, id: option.id, text: option.title, reply_to: message.wamid })"
                 >
                     {{ option.title }}
                 </button>
