@@ -144,6 +144,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sandbox (simulator)
+    |--------------------------------------------------------------------------
+    |
+    | Only in play when `driver` is `sandbox`. The simulator stores outbound
+    | messages instead of sending them, and feeds replies back through the REAL
+    | webhook route with a REAL HMAC signature — so the app's listeners run
+    | exactly as they do in production.
+    |
+    | display_phone_number is the business number as Meta prints it in the
+    | webhook `metadata` (cosmetic; the phone_number_id is what identifies you).
+    |
+    */
+
+    'sandbox' => [
+        'display_phone_number' => env('WHATSAPP_CLOUD_SANDBOX_DISPLAY_NUMBER', '15550000000'),
+        'prefix' => env('WHATSAPP_CLOUD_SANDBOX_PREFIX', 'whatsapp/cloud/sandbox'),
+        'middleware' => ['web', 'auth'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Template definitions
     |--------------------------------------------------------------------------
     |

@@ -1,0 +1,44 @@
+{
+    "object": "whatsapp_business_account",
+    "entry": [
+        {
+            "id": "999888777",
+            "changes": [
+                {
+                    "field": "messages",
+                    "value": {
+                        "messaging_product": "whatsapp",
+                        "metadata": {
+                            "display_phone_number": "15550000000",
+                            "phone_number_id": "111222333"
+                        },
+                        "contacts": [
+                            {
+                                "profile": {
+                                    "name": "Maria"
+                                },
+                                "wa_id": "5548999999999"
+                            }
+                        ],
+                        "messages": [
+                            {
+                                "from": "5548999999999",
+                                "id": "<wamid>",
+                                "timestamp": "<timestamp>",
+                                "context": {
+                                    "from": "15550000000",
+                                    "id": "wamid.ORIGINAL"
+                                },
+                                "type": "button",
+                                "button": {
+                                    "payload": "Aceitar",
+                                    "text": "Aceitar"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
