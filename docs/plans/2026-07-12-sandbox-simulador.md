@@ -187,19 +187,38 @@ Métodos: `text()`, `buttonReply()` (`interactive.button_reply`), `listReply()` 
 - Sempre estoura `CloudApiException` (não `WhatsAppException`) com `errorCode` preenchido — é o que `isTerminal()` e
   o `run()` do painel esperam.
 
-### 6. O corpo do template — pré-requisito, não detalhe
+### 6. O corpo do template — resolvido LOCALMENTE, antes da Meta
 
 [MetaTemplate](src/Templates/MetaTemplate.php) tem `name`, `language`, `category`, `bodyParams`. **Não tem o texto
-do corpo nem os botões.** O envelope enviado também não. Logo, com o que existe hoje, **é impossível desenhar a
-bolha do template com texto real e botões clicáveis** — e sem botão clicável não existe o fluxo.
+do corpo nem os botões**, e o envelope enviado também não. Sem resolver isso não existe bolha com texto real nem
+botão clicável — e sem botão clicável não existe fluxo.
 
-Solução: no envio, o `SandboxTransport` busca os componentes via
-`WhatsApp::templateApi()->getByName($name)` (control plane, HTTP real), cacheia por `(waba, name, language)` e
-**grava um snapshot na linha da mensagem** (`template_components` json) — a bolha renderiza pra sempre a partir da
-linha, sem re-fetch.
+**A fonte é o arquivo de definição local**, não a Meta. `{definitions_path}/<nome>.php` já retorna exatamente
+`['name', 'language', 'category', 'components' => [...]]` — o **mesmo shape** que a Meta devolve em `getByName()`,
+porque é o payload que foi (ou vai ser) submetido. É conteúdo versionado em git, e as guard-rails do
+[TemplateBuilder](src/Templates/TemplateBuilder.php#L63-L97) já rodaram nele.
 
-Consequência aceita: **o sandbox não é offline** — precisa de WABA + token válidos pra renderizar templates. Se o
-fetch falhar, degrada pra `name` + params crus, com um aviso no inspector.
+Isso é o que torna o sandbox uma **bancada de pré-submissão**: você fecha o texto, os botões e o fluxo inteiro
+**antes** de queimar o nome na Meta — e `create` é one-way (re-submeter o mesmo nome+idioma falha; não existe
+comando de `edit` nem de `delete` no CLI).
+
+`Sandbox/TemplateDefinitions` varre o `definitions_path` e indexa por **`(payload.name, payload.language)`** — não
+pelo nome do arquivo, que pode divergir do nome Meta ([CreateTemplate](src/Console/CreateTemplate.php#L30) usa o
+nome do arquivo, mas quem manda é o `payload['name']`).
+
+Ordem de resolução, no envio:
+1. **Arquivo de definição local** — offline, pré-Meta. **Primária.**
+2. **Meta** (`getByName()` + `Cache::remember` por `(waba, name, language)`) — fallback para template que existe lá
+   mas não tem definição local (ex.: criado pelo painel).
+3. **Degradação** — nome + params crus, com aviso no inspector.
+
+Em qualquer um dos três casos, os componentes resolvidos viram **snapshot na linha da mensagem**
+(`template_components` json): a bolha renderiza pra sempre a partir da linha, sem re-fetch.
+
+> **Bônus que cai no colo:** com o corpo local, o sandbox **expõe visualmente a armadilha nº 3 dos docs**. Se a
+> ordem de `params` no registry (`config.templates.<key>.params`) não bater com os `{{n}}` do corpo da definição,
+> hoje isso dessincroniza **em silêncio** e manda o valor errado pro cliente em produção. No sandbox, você vê o
+> valor errado na bolha. Vale um aviso explícito no inspector quando a contagem de params ≠ maior `{{n}}`.
 
 ---
 
@@ -296,11 +315,14 @@ de webhook em `tests/fixtures/webhooks/` — o pacote hoje não tem nenhum.
 o simulador, `app('request')`, `url()->current()`, `Route::current()` e `back()` continuam íntegros.* Esse segundo
 teste é a prova antirregressão da decisão de não reentrar no Kernel.
 
-**Fase 3 — `SandboxTransport` + migrations.** O produto, headless.
-→ *Marco, 100% sem UI: com `driver=sandbox`, `WhatsApp::for()->sendSessionText()` estoura `CloudApiException` com
+**Fase 3 — `SandboxTransport` + `TemplateDefinitions` + migrations.** O produto, headless.
+→ *Marco A, 100% sem UI: com `driver=sandbox`, `WhatsApp::for()->sendSessionText()` estoura `CloudApiException` com
 `errorCode 131047` e `isTerminal() === true`; um `InboundPayloadFactory::text()` entregue pelo simulador abre a
-janela; o mesmo `sendSessionText` agora passa e grava a linha.* **Aqui o produto já existe** — a UI é só uma janela
-pra ele.
+janela; o mesmo `sendSessionText` agora passa e grava a linha.*
+→ *Marco B (o que o time pediu): com `Http::preventStrayRequests()` — ou seja, **provando que a Meta não é tocada** —
+um `sendTemplate()` de um template que **só existe no arquivo de definição** grava a linha com os
+`template_components` resolvidos e os `{{n}}` substituídos.* **Aqui o produto já existe** — a UI é só uma janela pra
+ele.
 
 **Fase 4 — UI Inertia + polling.**
 → *Marco: `assertInertia()->component('WhatsAppCloud/Sandbox/Index')`; `GET /state` devolve JSON; a rota **não**
@@ -313,17 +335,24 @@ registra com `driver=cloud` nem sob `isProduction()`.*
 
 ## Verificação end-to-end (o teste de aceitação da equipe)
 
-Num app host (Coordena) com `WHATSAPP_CLOUD_DRIVER=sandbox`, `QUEUE_CONNECTION=sync` e um `app_secret` qualquer:
+Num app host (Coordena) com `WHATSAPP_CLOUD_DRIVER=sandbox`, `QUEUE_CONNECTION=sync` e um `app_secret` qualquer —
+**sem nenhum template submetido à Meta**, para provar que a bancada de pré-submissão funciona:
 
-1. Abrir `/whatsapp/cloud/sandbox`, criar dois participantes: "Maria" (customer) e "Suporte" (operator).
-2. Disparar o template real do app pro chat da Maria — a bolha aparece com o corpo e os botões de verdade.
-3. Clicar num botão da bolha **como a Maria** → webhook `type: button` assinado entra pela rota real → o listener do
-   app roda → a aba Rede mostra o payload, os listeners e o status 200.
-4. O listener manda pro Suporte → a bolha aparece no chat dele → responder como o Suporte → o sistema fecha com a
-   Maria. **Os três atores, o ciclo inteiro, sem um celular.**
-5. Em Falhas: fechar a janela de 24h → o próximo texto livre estoura `131047`, e a aba Rede mostra o app tratando
+1. Escrever `database/whatsapp-templates/coordena_assignment.php` (`TemplateBuilder::make(...)->body(...)
+   ->quickReply('Aceitar')->quickReply('Recusar')->toArray()`) e registrar a chave em `config.templates`. **Nada
+   ainda foi pra Meta.**
+2. Abrir `/whatsapp/cloud/sandbox`, criar dois participantes: "Maria" (customer) e "Suporte" (operator).
+3. Disparar o template pro chat da Maria — a bolha aparece com o **corpo e os botões do arquivo de definição**, com
+   os `{{n}}` já substituídos pelos params. Se a ordem do registry estiver trocada, você vê o valor errado aqui.
+4. Clicar em "Aceitar" **como a Maria** → webhook `type: button` assinado entra pela rota real → o listener do app
+   roda → a aba Rede mostra o payload, os listeners e o status 200.
+5. O listener manda pro Suporte → a bolha aparece no chat dele → responder como o Suporte → o sistema fecha com a
+   Maria. **Os três atores, o ciclo inteiro, sem um celular e sem um template aprovado.**
+6. Em Falhas: fechar a janela de 24h → o próximo texto livre estoura `131047`, e a aba Rede mostra o app tratando
    (ou não) o erro terminal.
-6. Trocar pra `QUEUE_CONNECTION=redis` com um worker rodando → a mensagem aparece com atraso, via polling. Prova
+7. Só então: `whatsapp:template:create coordena_assignment` — o texto já está validado, e o nome é queimado uma vez
+   só, com confiança.
+8. Trocar pra `QUEUE_CONNECTION=redis` com um worker rodando → a mensagem aparece com atraso, via polling. Prova
    que o caminho enfileirado (o de produção) funciona.
 
 E `composer test` (pint + phpstan level 6 + pest) verde em todas as fases.
