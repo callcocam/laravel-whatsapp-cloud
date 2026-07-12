@@ -10,6 +10,8 @@ use Callcocam\WhatsAppCloud\Console\ScaffoldPanel;
 use Callcocam\WhatsAppCloud\Console\SendTemplate;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
+use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
+use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
 use Callcocam\WhatsAppCloud\Transport\CloudApiTransport;
@@ -62,13 +64,18 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
     {
         $this->app->bind(CloudApiTransport::class, fn () => new CloudApiTransport);
 
+        $this->app->bind(TemplateDefinitions::class, fn ($app) => new TemplateDefinitions(
+            $app['config']->get('whatsapp-cloud.definitions_path'),
+        ));
+
         $this->app->bind(MessageTransport::class, function ($app) {
             $driver = (string) $app['config']->get('whatsapp-cloud.driver', 'cloud');
 
             return match ($driver) {
                 'cloud' => $app->make(CloudApiTransport::class),
+                'sandbox' => $app->make(SandboxTransport::class),
                 default => throw new InvalidArgumentException(
-                    "Unknown whatsapp-cloud driver [{$driver}]. Expected 'cloud'.",
+                    "Unknown whatsapp-cloud driver [{$driver}]. Expected 'cloud' or 'sandbox'.",
                 ),
             };
         });
@@ -156,6 +163,12 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../database/migrations/2026_01_01_000000_create_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_numbers_table.php'),
         ], 'whatsapp-cloud-migrations');
+
+        // A separate tag, so an app that only sends messages never acquires the
+        // sandbox tables.
+        $this->publishes([
+            __DIR__.'/../database/migrations/2026_07_12_000000_create_whatsapp_sandbox_tables.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_sandbox_tables.php'),
+        ], 'whatsapp-cloud-sandbox-migrations');
 
         // The panel's Vue pages must be compiled by the host app's Vite build, so
         // publish them into resources/js/pages/ where the Inertia page resolver
