@@ -8,18 +8,23 @@ use Callcocam\WhatsAppCloud\Console\InstallCommand;
 use Callcocam\WhatsAppCloud\Console\ListTemplates;
 use Callcocam\WhatsAppCloud\Console\ScaffoldPanel;
 use Callcocam\WhatsAppCloud\Console\SendTemplate;
+use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
+use Callcocam\WhatsAppCloud\Transport\CloudApiTransport;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 class WhatsAppCloudServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/whatsapp-cloud.php', 'whatsapp-cloud');
+
+        $this->registerTransport();
 
         $this->app->singleton(TemplateRegistry::class, fn ($app) => new TemplateRegistry(
             (array) $app['config']->get('whatsapp-cloud.templates', []),
@@ -44,6 +49,29 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         ));
 
         $this->app->alias(WhatsAppManager::class, 'whatsapp-cloud');
+    }
+
+    /**
+     * Bind the wire every outbound message travels on.
+     *
+     * `bind`, never `singleton`: a test — or a developer flipping the driver —
+     * must be able to change the answer after the manager was already resolved.
+     * A cached singleton here would silently keep sending to Meta.
+     */
+    protected function registerTransport(): void
+    {
+        $this->app->bind(CloudApiTransport::class, fn () => new CloudApiTransport);
+
+        $this->app->bind(MessageTransport::class, function ($app) {
+            $driver = (string) $app['config']->get('whatsapp-cloud.driver', 'cloud');
+
+            return match ($driver) {
+                'cloud' => $app->make(CloudApiTransport::class),
+                default => throw new InvalidArgumentException(
+                    "Unknown whatsapp-cloud driver [{$driver}]. Expected 'cloud'.",
+                ),
+            };
+        });
     }
 
     public function boot(): void

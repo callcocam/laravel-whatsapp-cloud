@@ -3,7 +3,9 @@
 namespace Callcocam\WhatsAppCloud\Templates;
 
 use Callcocam\WhatsAppCloud\CloudApiClient;
+use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
+use Callcocam\WhatsAppCloud\Support\ArrayCredentials;
 use Callcocam\WhatsAppCloud\WhatsAppManager;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
@@ -18,6 +20,12 @@ use Illuminate\Support\Facades\Http;
  * This is the "control plane" (message_templates endpoints), separate from the
  * "data plane" {@see CloudApiClient} that sends runtime
  * messages.
+ *
+ * The management calls always hit Meta for real — a template is a real object on
+ * a real WABA, there is nothing to simulate. Only {@see send()} goes through the
+ * {@see MessageTransport}, because it delivers an actual message to an actual
+ * person: under the sandbox driver the panel's "send test" button must NOT reach
+ * a real phone.
  */
 final class TemplateManager
 {
@@ -26,6 +34,7 @@ final class TemplateManager
         private readonly string $wabaId,
         private readonly string $accessToken,
         private readonly ?string $phoneNumberId = null,
+        private ?MessageTransport $transport = null,
     ) {}
 
     /**
@@ -107,6 +116,9 @@ final class TemplateManager
     /**
      * Send a message using an approved template.
      *
+     * Goes through the {@see MessageTransport} — this is a real message to a real
+     * person, so the sandbox driver has to be able to intercept it.
+     *
      * @param  array<int, string|int|float>  $bodyParams  positional values for {{1}}, {{2}}…
      * @return array<string, mixed>
      */
@@ -131,12 +143,30 @@ final class TemplateManager
             ]];
         }
 
-        return $this->handle(fn () => $this->request()->post("{$this->phoneNumberId}/messages", [
+        return $this->transport()->postMessage($this->credentials(), [
             'messaging_product' => 'whatsapp',
             'to' => $to,
             'type' => 'template',
             'template' => $template,
-        ]))->json();
+        ]);
+    }
+
+    /**
+     * Resolved lazily — see {@see CloudApiClient::transport()}.
+     */
+    private function transport(): MessageTransport
+    {
+        return $this->transport ??= app(MessageTransport::class);
+    }
+
+    private function credentials(): ArrayCredentials
+    {
+        return new ArrayCredentials(
+            (string) $this->phoneNumberId,
+            $this->accessToken,
+            $this->wabaId,
+            $this->graphVersion,
+        );
     }
 
     /**

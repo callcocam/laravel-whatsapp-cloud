@@ -25,6 +25,9 @@ class CloudApiFactory
             phoneNumberId: $credentials->phoneNumberId(),
             accessToken: $credentials->accessToken(),
             templates: $this->templates,
+            // Left null on purpose: the client resolves the transport lazily, so
+            // the driver in force is the one at send time, not at build time.
+            transport: null,
         );
     }
 }

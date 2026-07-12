@@ -3,15 +3,13 @@
 namespace Callcocam\WhatsAppCloud;
 
 use Callcocam\WhatsAppCloud\Contracts\MessageGateway;
-use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
+use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
+use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
 use Callcocam\WhatsAppCloud\Messages\InteractiveMessage;
 use Callcocam\WhatsAppCloud\Messages\SendResult;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
+use Callcocam\WhatsAppCloud\Support\ArrayCredentials;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 
 /**
  * The official (Meta Cloud API) provider — the only WhatsApp channel. It speaks
@@ -20,6 +18,10 @@ use Illuminate\Support\Facades\Http;
  *
  * One instance is bound to one number's credentials; build it through
  * {@see CloudApiFactory} (or {@see WhatsAppManager::for()}).
+ *
+ * It builds envelopes; it does not own the wire. Delivery goes through the bound
+ * {@see MessageTransport}, which the `whatsapp-cloud.driver` config selects — so
+ * the sandbox can divert every message without this class knowing.
  */
 class CloudApiClient implements MessageGateway
 {
@@ -30,6 +32,7 @@ class CloudApiClient implements MessageGateway
         protected readonly string $phoneNumberId,
         protected readonly string $accessToken,
         protected readonly TemplateRegistry $templates,
+        protected ?MessageTransport $transport = null,
     ) {}
 
     /**
@@ -104,40 +107,28 @@ class CloudApiClient implements MessageGateway
      */
     protected function send(string $to, array $payload): SendResult
     {
-        $response = $this->handle(fn () => $this->request()->post('/messages', array_merge([
+        $response = $this->transport()->postMessage($this->credentials(), array_merge([
             'messaging_product' => 'whatsapp',
             'recipient_type' => 'individual',
             'to' => $to,
-        ], $payload)));
+        ], $payload));
 
-        $wamid = $response->json('messages.0.id');
+        $wamid = data_get($response, 'messages.0.id');
 
         return SendResult::sent(self::PROVIDER, is_string($wamid) ? $wamid : null);
     }
 
     /**
-     * @param  callable(): Response  $callback
+     * Resolved lazily, never in the constructor: a test (or the sandbox panel)
+     * may flip `whatsapp-cloud.driver` after this client was already built.
      */
-    protected function handle(callable $callback): Response
+    protected function transport(): MessageTransport
     {
-        try {
-            $response = $callback();
-        } catch (ConnectionException $exception) {
-            throw new CloudApiException('Could not connect to the WhatsApp Cloud API.', previous: $exception);
-        }
-
-        if ($response->failed()) {
-            throw CloudApiException::fromResponse($response);
-        }
-
-        return $response;
+        return $this->transport ??= app(MessageTransport::class);
     }
 
-    protected function request(): PendingRequest
+    protected function credentials(): WhatsAppCredentials
     {
-        return Http::baseUrl("https://graph.facebook.com/{$this->graphVersion}/{$this->phoneNumberId}")
-            ->withToken($this->accessToken)
-            ->acceptJson()
-            ->timeout(10);
+        return new ArrayCredentials($this->phoneNumberId, $this->accessToken, null, $this->graphVersion);
     }
 }

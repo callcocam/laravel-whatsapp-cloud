@@ -19,6 +19,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Transport driver
+    |--------------------------------------------------------------------------
+    |
+    | Which wire outbound messages travel on.
+    |
+    |   cloud   — the real Graph API. The only value valid in production.
+    |   sandbox — the local simulator: nothing reaches Meta, messages are stored
+    |             and the WhatsApp-facing screen replays the conversation.
+    |
+    | This MUST come from the environment, never from a runtime toggle: a queued
+    | listener sends from a worker process, which reads its own .env. A driver
+    | flipped at runtime would not reach that worker, and the message would go to
+    | a real phone. After changing it: `config:clear` and `queue:restart`.
+    |
+    */
+
+    'driver' => env('WHATSAPP_CLOUD_DRIVER', 'cloud'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Meta App identity
     |--------------------------------------------------------------------------
     |
