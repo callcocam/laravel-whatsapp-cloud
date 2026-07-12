@@ -39,8 +39,13 @@ abstract class TestCase extends Orchestra
         ));
 
         // Point Inertia's page-existence check at the package's Vue pages so
-        // assertInertia() verifies the component file actually ships.
-        $app['config']->set('inertia.testing.page_paths', [dirname(__DIR__).'/resources/js/pages']);
+        // assertInertia() verifies the component file actually ships. The sandbox
+        // page is a separate root — it must stay out of resources/js/pages, which
+        // the `whatsapp-cloud-inertia` tag publishes wholesale.
+        $app['config']->set('inertia.testing.page_paths', [
+            dirname(__DIR__).'/resources/js/pages',
+            dirname(__DIR__).'/resources/js/sandbox',
+        ]);
         $app['config']->set('whatsapp-cloud.graph_version', 'v21.0');
         $app['config']->set('whatsapp-cloud.app_secret', 'test-app-secret');
         $app['config']->set('whatsapp-cloud.verify_token', 'test-verify-token');

@@ -85,6 +85,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
     {
         $this->registerRoutes();
         $this->registerPanelRoutes();
+        $this->registerSandboxRoutes();
         $this->registerPublishing();
 
         if ($this->app->runningInConsole()) {
@@ -150,6 +151,37 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Register the sandbox screen.
+     *
+     * The guard runs both ways, because both directions are dangerous:
+     *
+     *  - The screen only exists when the driver IS `sandbox`. A sandbox UI up
+     *    while the driver is `cloud` would fire real WhatsApp messages at a real
+     *    phone from a page labelled "simulator".
+     *  - And never in production, whatever the config says.
+     */
+    protected function registerSandboxRoutes(): void
+    {
+        $config = $this->app['config'];
+
+        if ($config->get('whatsapp-cloud.driver') !== 'sandbox' || ! class_exists(Inertia::class)) {
+            return;
+        }
+
+        if ($this->app->isProduction()) {
+            return;
+        }
+
+        Route::group([
+            'prefix' => $config->get('whatsapp-cloud.sandbox.prefix', 'whatsapp/cloud/sandbox'),
+            'middleware' => (array) $config->get('whatsapp-cloud.sandbox.middleware', ['web', 'auth']),
+            'as' => 'whatsapp.cloud.sandbox.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__.'/../routes/sandbox.php');
+        });
+    }
+
     protected function registerPublishing(): void
     {
         if (! $this->app->runningInConsole()) {
@@ -178,5 +210,13 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../resources/js/pages/WhatsAppCloud' => resource_path('js/pages/WhatsAppCloud'),
         ], 'whatsapp-cloud-inertia');
+
+        // The sandbox page lives OUTSIDE resources/js/pages on purpose. That
+        // publish above maps a DIRECTORY, recursively — a Sandbox/ folder in there
+        // would be copied into every production app that publishes the panel, and
+        // compiled into its bundle. Separate source, separate tag.
+        $this->publishes([
+            __DIR__.'/../resources/js/sandbox/WhatsAppCloud/Sandbox' => resource_path('js/pages/WhatsAppCloud/Sandbox'),
+        ], 'whatsapp-cloud-sandbox');
     }
 }

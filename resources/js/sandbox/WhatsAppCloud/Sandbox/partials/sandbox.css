@@ -1,0 +1,539 @@
+/* WhatsApp sandbox. Self-contained and scoped under .wa-sandbox so it never
+   leaks into the host app — and so it does not depend on the panel's stylesheet,
+   which the host owns once published. Light/dark auto. */
+
+.wa-sandbox {
+    color-scheme: light dark;
+
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #f7f9fb;
+    --border: #e3e7ec;
+    --text: #1b2027;
+    --muted: #63707f;
+    --faint: #8a95a3;
+
+    --accent: #128c7e;
+    --accent-strong: #0e6f63;
+    --accent-contrast: #ffffff;
+
+    --danger: #d1414a;
+    --danger-soft: #fbe7e8;
+    --ok: #1f9d55;
+    --warn: #b6801a;
+    --warn-soft: #fbf1d9;
+
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox {
+        --bg: #0f141a;
+        --surface: #171d25;
+        --surface-2: #1e252f;
+        --border: #2a323d;
+        --text: #e7ecf2;
+        --muted: #9aa6b4;
+        --faint: #6d7987;
+        --danger-soft: #3a1f22;
+        --warn-soft: #3a2f16;
+    }
+}
+
+/* ---------- shell ---------- */
+
+.wa-sandbox .sb-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.wa-sandbox .sb-title { font-weight: 700; }
+
+.wa-sandbox .sb-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--warn-soft);
+    color: var(--warn);
+}
+
+.wa-sandbox .sb-num {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.wa-sandbox .sb-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr) 380px;
+    min-height: 0;
+}
+
+@media (max-width: 1100px) {
+    .wa-sandbox .sb-body { grid-template-columns: 220px minmax(0, 1fr); }
+    .wa-sandbox .sb-inspector { display: none; }
+}
+
+/* ---------- left: participants ---------- */
+
+.wa-sandbox .sb-people {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.wa-sandbox .sb-person {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 0;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    color: inherit;
+    font: inherit;
+}
+
+.wa-sandbox .sb-person:hover { background: var(--surface-2); }
+.wa-sandbox .sb-person.is-on { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
+
+.wa-sandbox .sb-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    flex: none;
+}
+
+.wa-sandbox .sb-person-main { min-width: 0; flex: 1; }
+.wa-sandbox .sb-person-name { font-weight: 600; font-size: 14px; }
+.wa-sandbox .sb-person-sub {
+    font-size: 11.5px;
+    color: var(--muted);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.wa-sandbox .sb-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.wa-sandbox .sb-dot.open { background: var(--ok); }
+.wa-sandbox .sb-dot.shut { background: var(--danger); }
+
+.wa-sandbox .sb-role {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: var(--faint);
+}
+
+/* ---------- centre: the chat ---------- */
+
+.wa-sandbox .sb-chat {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #d9dbd2;
+    background-image:
+        radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.4) 0, transparent 40%),
+        linear-gradient(135deg, #d2dbd0, #cfd8cd);
+}
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .sb-chat {
+        background: #0b141a;
+        background-image: linear-gradient(135deg, #0d171e, #0a1218);
+    }
+}
+
+.wa-sandbox .sb-chat-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.wa-sandbox .sb-chat-name { font-weight: 600; font-size: 14px; }
+.wa-sandbox .sb-chat-sub { font-size: 11.5px; color: var(--muted); }
+
+.wa-sandbox .sb-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wa-sandbox .sb-day {
+    align-self: center;
+    background: rgba(255, 255, 255, 0.8);
+    color: #54656f;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 7px;
+    margin: 6px 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .sb-day { background: #182229; color: #8696a0; }
+}
+
+.wa-sandbox .sb-empty {
+    margin: auto;
+    text-align: center;
+    color: #54656f;
+    background: rgba(255, 255, 255, 0.75);
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    max-width: 380px;
+    font-size: 13.5px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .sb-empty { background: #182229; color: #8696a0; }
+}
+
+/* ---------- bubbles ---------- */
+
+.wa-sandbox .row { display: flex; }
+.wa-sandbox .row.out { justify-content: flex-end; }
+
+.wa-sandbox .bubble {
+    background: #ffffff;
+    color: #111b21;
+    border-radius: 8px 8px 8px 0;
+    padding: 7px 9px 5px;
+    max-width: min(70%, 460px);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.13);
+    font-size: 14px;
+    line-height: 1.42;
+    word-wrap: break-word;
+    cursor: pointer;
+}
+
+.wa-sandbox .row.out .bubble {
+    background: #d9fdd3;
+    border-radius: 8px 8px 0 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .bubble { background: #202c33; color: #e9edef; }
+    .wa-sandbox .row.out .bubble { background: #005c4b; }
+}
+
+.wa-sandbox .bubble.is-on { outline: 2px solid var(--accent); }
+.wa-sandbox .bubble.failed { border-left: 3px solid var(--danger); }
+
+.wa-sandbox .b-header { font-weight: 700; margin-bottom: 3px; }
+.wa-sandbox .b-body { white-space: pre-wrap; }
+.wa-sandbox .b-body code { font-family: var(--mono); font-size: 12.5px; }
+.wa-sandbox .b-footer { margin-top: 5px; font-size: 12px; color: #667781; }
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .b-footer { color: #8696a0; }
+}
+
+.wa-sandbox .b-tag {
+    display: inline-block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: #667781;
+    margin-bottom: 3px;
+}
+
+.wa-sandbox .b-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    font-size: 10.5px;
+    color: #667781;
+    margin-top: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .b-meta, .wa-sandbox .b-tag { color: #8696a0; }
+}
+
+.wa-sandbox .b-tick.read { color: #53bdeb; }
+.wa-sandbox .b-tick.failed { color: var(--danger); font-weight: 700; }
+
+.wa-sandbox .bubble-buttons {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.wa-sandbox .bubble-buttons .bb {
+    background: #ffffff;
+    color: #027eb5;
+    text-align: center;
+    padding: 8px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    font-weight: 500;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.13);
+    border: 0;
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.wa-sandbox .bubble-buttons .bb:disabled { color: var(--faint); cursor: default; }
+.wa-sandbox .bubble-buttons .bb:not(:disabled):hover { background: #f0f2f5; }
+
+@media (prefers-color-scheme: dark) {
+    .wa-sandbox .bubble-buttons .bb { background: #202c33; color: #53bdeb; }
+    .wa-sandbox .bubble-buttons .bb:not(:disabled):hover { background: #2a3942; }
+}
+
+.wa-sandbox .b-warn {
+    margin-top: 5px;
+    font-size: 11.5px;
+    background: var(--warn-soft);
+    color: var(--warn);
+    padding: 4px 6px;
+    border-radius: 5px;
+}
+
+/* ---------- composer ---------- */
+
+.wa-sandbox .sb-composer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px 10px;
+}
+
+.wa-sandbox .sb-as {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 7px;
+}
+
+.wa-sandbox .sb-as button {
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.wa-sandbox .sb-as button.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+}
+
+.wa-sandbox .sb-input { display: flex; gap: 8px; }
+
+.wa-sandbox .sb-input input {
+    flex: 1;
+    font: inherit;
+    font-size: 14px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.wa-sandbox .sb-input input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.wa-sandbox .btn {
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.wa-sandbox .btn:hover { border-color: var(--accent); }
+.wa-sandbox .btn:disabled { opacity: 0.5; cursor: default; }
+
+.wa-sandbox .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    border-radius: 999px;
+}
+
+.wa-sandbox .btn.tiny { font-size: 11.5px; padding: 3px 8px; }
+.wa-sandbox .btn.danger { color: var(--danger); }
+
+/* ---------- right: inspector ---------- */
+
+.wa-sandbox .sb-inspector {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.wa-sandbox .sb-tabs { display: flex; border-bottom: 1px solid var(--border); }
+
+.wa-sandbox .sb-tabs button {
+    flex: 1;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 10px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+
+.wa-sandbox .sb-tabs button.is-on { color: var(--accent); border-bottom-color: var(--accent); }
+
+.wa-sandbox .sb-pane { flex: 1; overflow-y: auto; padding: 14px; }
+
+.wa-sandbox .sb-h {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: var(--faint);
+    margin: 14px 0 5px;
+}
+
+.wa-sandbox .sb-h:first-child { margin-top: 0; }
+
+.wa-sandbox pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-x: auto;
+    margin: 0;
+    white-space: pre;
+}
+
+.wa-sandbox .sb-kv {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.wa-sandbox .sb-kv span:first-child { color: var(--muted); }
+.wa-sandbox .sb-kv span:last-child { font-family: var(--mono); text-align: right; word-break: break-all; }
+
+.wa-sandbox .sb-fail {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border-radius: var(--radius-sm);
+    padding: 9px;
+    font-size: 12px;
+}
+
+.wa-sandbox .sb-note {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.5;
+}
+
+.wa-sandbox .sb-fault {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+}
+
+.wa-sandbox .sb-fault-main { flex: 1; min-width: 0; }
+.wa-sandbox .sb-fault-code { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+.wa-sandbox .sb-pill {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.wa-sandbox .sb-pill.retry { background: var(--warn-soft); color: var(--warn); }
+
+.wa-sandbox .sb-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.wa-sandbox .sb-row + .sb-row { margin-top: 6px; }
+
+.wa-sandbox .sb-field {
+    width: 100%;
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.wa-sandbox .sb-alert {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border-radius: var(--radius-sm);
+    padding: 9px 11px;
+    font-size: 12.5px;
+    margin: 10px 14px 0;
+}
+
+.wa-sandbox .sb-alert.terminal::after {
+    content: " Terminal — a fila não deve retentar.";
+    font-weight: 600;
+}

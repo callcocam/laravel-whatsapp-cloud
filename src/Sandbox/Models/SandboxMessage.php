@@ -4,6 +4,7 @@ namespace Callcocam\WhatsAppCloud\Sandbox\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * One simulated message, with both raw payloads kept verbatim — what we POSTed
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $delivery_status
  * @property int|null $error_code
  * @property array<string, mixed>|null $meta
+ * @property Carbon|null $created_at
  */
 class SandboxMessage extends Model
 {

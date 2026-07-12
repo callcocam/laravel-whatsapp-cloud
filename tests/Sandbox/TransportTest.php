@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
-    config()->set('whatsapp-cloud.driver', 'sandbox');
-
     // Nothing in this suite may touch Meta. If a stray request escapes, the
     // sandbox is not a sandbox.
     Http::preventStrayRequests();
