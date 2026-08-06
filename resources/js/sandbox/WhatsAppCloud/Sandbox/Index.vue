@@ -12,6 +12,7 @@ const props = defineProps({
     messages: { type: Array, default: () => [] },
     faults: { type: Array, default: () => [] },
     templates: { type: Array, default: () => [] },
+    recipients: { type: Array, default: () => [] },
     business: { type: Object, required: true },
 })
 
@@ -25,6 +26,7 @@ const state = ref({
     messages: props.messages,
     faults: props.faults,
     templates: props.templates,
+    recipients: props.recipients,
 })
 
 const active = computed(() => state.value.conversations.find((c) => c.id === state.value.selected) ?? null)
@@ -138,6 +140,45 @@ function add() {
     })
 }
 
+/* ---------- importing the app's own contacts ----------
+ * The provider hands back a flat list; group it for the UI. A ticked set drives
+ * "import selected"; empty means "import all" on the backend. */
+const importing = ref(false)
+const chosen = ref(new Set())
+
+const recipientGroups = computed(() => {
+    const groups = new Map()
+    for (const recipient of state.value.recipients ?? []) {
+        const key = recipient.group ?? 'Contatos'
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(recipient)
+    }
+    return Array.from(groups, ([label, items]) => ({ label, items }))
+})
+
+const pendingRecipients = computed(() =>
+    (state.value.recipients ?? []).filter((recipient) => !recipient.imported),
+)
+
+function toggleChosen(waId) {
+    const next = new Set(chosen.value)
+    next.has(waId) ? next.delete(waId) : next.add(waId)
+    chosen.value = next
+}
+
+function importChosen(all = false) {
+    const waIds = all ? [] : Array.from(chosen.value)
+    if (!all && waIds.length === 0) return
+
+    router.post(`${panelUrl.value}/participants/import`, { wa_ids: waIds }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            chosen.value = new Set()
+            poll()
+        },
+    })
+}
+
 const flash = computed(() => page.props.flash ?? {})
 
 /* Date separators, so a long rehearsal stays readable. */
@@ -203,6 +244,47 @@ const withDays = computed(() => {
                     <button v-else class="btn" style="width: 100%" @click="adding = true">
                         + Participante
                     </button>
+                </div>
+
+                <!-- ---------- app contacts, offered for import ---------- -->
+                <div v-if="(state.recipients ?? []).length" class="sb-recipients">
+                    <button class="sb-recipients-toggle" @click="importing = !importing">
+                        <span>Contatos do app ({{ pendingRecipients.length }})</span>
+                        <span class="sb-caret">{{ importing ? '–' : '+' }}</span>
+                    </button>
+
+                    <template v-if="importing">
+                        <div v-for="group in recipientGroups" :key="group.label" class="sb-rec-group">
+                            <div class="sb-rec-group-title">{{ group.label }}</div>
+                            <label
+                                v-for="recipient in group.items"
+                                :key="recipient.wa_id"
+                                class="sb-rec-item"
+                                :class="{ 'is-imported': recipient.imported }"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :disabled="recipient.imported"
+                                    :checked="chosen.has(recipient.wa_id)"
+                                    @change="toggleChosen(recipient.wa_id)"
+                                >
+                                <span class="sb-rec-main">
+                                    <span class="sb-rec-name">{{ recipient.name }}</span>
+                                    <span class="sb-rec-num">{{ recipient.wa_id }}</span>
+                                </span>
+                                <span v-if="recipient.imported" class="sb-rec-tag">já no chat</span>
+                            </label>
+                        </div>
+
+                        <div class="sb-row" style="padding: 0 12px 12px">
+                            <button class="btn primary" :disabled="!chosen.size" @click="importChosen(false)">
+                                Importar selecionados
+                            </button>
+                            <button class="btn" :disabled="!pendingRecipients.length" @click="importChosen(true)">
+                                Importar todos
+                            </button>
+                        </div>
+                    </template>
                 </div>
             </nav>
 

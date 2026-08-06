@@ -22,6 +22,9 @@ Route::get('/messages/{message}', [SandboxController::class, 'message'])->name('
 
 Route::post('/participants', [SandboxController::class, 'storeParticipant'])->name('participants.store');
 
+// Bulk-add the app's own contacts (from the bound SandboxRecipientProvider).
+Route::post('/participants/import', [SandboxController::class, 'importRecipients'])->name('participants.import');
+
 // The person answers.
 Route::post('/reply', [SandboxController::class, 'reply'])->name('reply');
 Route::post('/tap', [SandboxController::class, 'tap'])->name('tap');

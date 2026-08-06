@@ -2,6 +2,7 @@
 
 namespace Callcocam\WhatsAppCloud\Http\Controllers;
 
+use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppException;
 use Callcocam\WhatsAppCloud\Facades\WhatsApp;
 use Callcocam\WhatsAppCloud\Sandbox\Fault;
@@ -30,6 +31,7 @@ class SandboxController
     public function __construct(
         private readonly Sandbox $sandbox,
         private readonly TemplateDefinitions $definitions,
+        private readonly SandboxRecipientProvider $recipients,
     ) {}
 
     public function index(): Response
@@ -72,6 +74,35 @@ class SandboxController
             trim((string) $request->input('name')) ?: $waId,
             (string) $request->input('role', 'customer'),
         );
+
+        return back();
+    }
+
+    /**
+     * Turn one or more app-provided recipients into conversations. The screen
+     * sends the wa_ids the operator ticked (or all of them); each becomes a
+     * SandboxConversation, exactly as a hand-added participant would.
+     */
+    public function importRecipients(Request $request): RedirectResponse
+    {
+        /** @var list<string> $wanted */
+        $wanted = array_values(array_filter(array_map(
+            static fn ($id): string => (string) preg_replace('/\D+/', '', (string) $id),
+            (array) $request->input('wa_ids', []),
+        )));
+
+        // Nothing ticked means "import them all".
+        $all = $wanted === [];
+
+        foreach ($this->recipients->recipients() as $recipient) {
+            if (! $recipient->isValid()) {
+                continue;
+            }
+
+            if ($all || in_array($recipient->waId, $wanted, true)) {
+                $this->sandbox->participant($recipient->waId, $recipient->name, $recipient->role);
+            }
+        }
 
         return back();
     }
@@ -246,7 +277,35 @@ class SandboxController
                 'phone_number_id' => WhatsApp::credentials()->phoneNumberId(),
                 'display_phone_number' => (string) config('whatsapp-cloud.sandbox.display_phone_number'),
             ],
+
+            // The app's contacts, offered for import. Each carries `imported`,
+            // so the screen can grey out the ones that are already a conversation.
+            'recipients' => $this->recipients($conversations->pluck('wa_id')->all()),
         ];
+    }
+
+    /**
+     * The importable recipients from the app's provider, flagged with whether
+     * each already exists as a conversation.
+     *
+     * @param  list<string>  $existing  wa_ids already turned into conversations.
+     * @return list<array{wa_id: string, name: string, role: string, group: string|null, imported: bool}>
+     */
+    private function recipients(array $existing): array
+    {
+        $recipients = [];
+
+        foreach ($this->recipients->recipients() as $recipient) {
+            if (! $recipient->isValid()) {
+                continue;
+            }
+
+            $recipients[] = $recipient->toArray() + [
+                'imported' => in_array($recipient->waId, $existing, true),
+            ];
+        }
+
+        return $recipients;
     }
 
     /**

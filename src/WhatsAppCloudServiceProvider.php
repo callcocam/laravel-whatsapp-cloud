@@ -9,10 +9,12 @@ use Callcocam\WhatsAppCloud\Console\ListTemplates;
 use Callcocam\WhatsAppCloud\Console\ScaffoldPanel;
 use Callcocam\WhatsAppCloud\Console\SendTemplate;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
+use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
+use Callcocam\WhatsAppCloud\Support\NullSandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
 use Callcocam\WhatsAppCloud\Transport\CloudApiTransport;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +44,10 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->app->bind(WhatsAppCredentialsResolver::class, fn ($app) => new ConfigCredentialsResolver(
             (array) $app['config']->get('whatsapp-cloud.default', []),
         ));
+
+        // Who the sandbox can talk to. Empty by default — an app binds its own to
+        // surface its contacts (see SandboxRecipientProvider).
+        $this->app->bind(SandboxRecipientProvider::class, NullSandboxRecipientProvider::class);
 
         $this->app->singleton(WhatsAppManager::class, fn ($app) => new WhatsAppManager(
             factory: $app->make(CloudApiFactory::class),
