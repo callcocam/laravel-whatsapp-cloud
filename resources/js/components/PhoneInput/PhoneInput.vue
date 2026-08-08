@@ -24,6 +24,7 @@ const props = defineProps({
     disabled: { type: Boolean, default: false },
     /** Marca o campo como inválido (borda de erro). */
     invalid: { type: Boolean, default: false },
+    required: { type: Boolean, default: false },
     id: { type: String, default: undefined },
 })
 
@@ -72,6 +73,7 @@ function onInput(event) {
             class="wa-phone-native"
             :placeholder="placeholder"
             :disabled="disabled"
+            :required="required || undefined"
             :aria-invalid="isInvalid || undefined"
             @input="onInput"
             @keyup.enter="emit('enter')"
