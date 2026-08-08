@@ -315,6 +315,63 @@ Config que o Coordena publica: `panel.component = WhatsAppCloud/Templates/Index`
 via `flash.toast = { type, message }` (`send` inclui `flash.sent_id`); erros via
 `errors.meta` / `errors.form`.
 
+### Componente PhoneInput (campo de telefone no padrão da Meta)
+
+Campo de telefone Vue reutilizável que já entrega o `wa_id` no formato que a Meta
+espera — **dígitos puros `DDI+DDD+número`** (ex.: `5548999999999`), com máscara de
+exibição, prefixo de DDI automático e o 9º dígito do celular BR garantido.
+
+É **CSS puro e autocontido** (não depende de nenhum design system); personalize pelas
+CSS custom properties `--wa-phone-*`.
+
+Publique no seu app:
+
+```bash
+php artisan vendor:publish --tag=whatsapp-cloud-vue-components
+# → resources/js/components/whatsapp-cloud/PhoneInput/{PhoneInput.vue, phone.ts}
+```
+
+Uso:
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import PhoneInput from '@/components/whatsapp-cloud/PhoneInput/PhoneInput.vue'
+
+const phone = ref('') // recebe SEMPRE os dígitos normalizados: '5548999999999'
+const valid = ref(false)
+</script>
+
+<template>
+  <!-- digita "(48) 99999-9999" → v-model vira "5548999999999" -->
+  <PhoneInput v-model="phone" default-country="55" @valid="valid = $event" />
+</template>
+```
+
+Props: `modelValue` (dígitos `wa_id`), `defaultCountry` (padrão `55`), `placeholder`,
+`disabled`, `invalid`, `id`, `inputClass`. Eventos: `update:modelValue`, `valid`, `enter`.
+
+Também dá para usar só a lógica, sem o componente:
+
+```ts
+import { normalizeMetaPhone, isValidMetaPhone, formatPhoneBR } from '@/components/whatsapp-cloud/PhoneInput/phone'
+
+normalizeMetaPhone('(48) 99999-9999') // '5548999999999'
+isValidMetaPhone('5548999999999')     // true
+formatPhoneBR('5548999999999')        // '+55 (48) 99999-9999'
+```
+
+Para casar com um design system (ex.: shadcn), tematize via CSS vars no host:
+
+```css
+.meu-wrapper .wa-phone-input {
+  --wa-phone-height: 2.25rem;      /* h-9 */
+  --wa-phone-radius: 0.375rem;     /* rounded-md */
+  --wa-phone-border: var(--border);
+  --wa-phone-ring: var(--ring);
+}
+```
+
 ### Credenciais (multi-tenant)
 
 Implemente o contrato no seu model (ou use a trait) e binde um resolver:

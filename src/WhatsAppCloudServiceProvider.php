@@ -224,5 +224,13 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../resources/js/sandbox/WhatsAppCloud/Sandbox' => resource_path('js/pages/WhatsAppCloud/Sandbox'),
         ], 'whatsapp-cloud-sandbox');
+
+        // Componentes Vue reutilizáveis (fora do painel). Ex.: PhoneInput — campo de
+        // telefone que já entrega o `wa_id` no padrão da Meta. CSS puro, autocontido,
+        // sem depender do design system do host. Namespace `whatsapp-cloud/` evita
+        // colisão com o `components/ui` do app.
+        $this->publishes([
+            __DIR__.'/../resources/js/components/PhoneInput' => resource_path('js/components/whatsapp-cloud/PhoneInput'),
+        ], 'whatsapp-cloud-vue-components');
     }
 }
