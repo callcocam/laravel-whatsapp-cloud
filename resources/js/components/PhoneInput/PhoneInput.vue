@@ -87,6 +87,9 @@ function onInput(event) {
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
+    /* Flex-safe: num flex-row (ex.: campo + botão) o input encolhe até 0 se preciso,
+       em vez de estourar a largura ou colapsar num quadradinho. */
+    flex: 1 1 auto;
     height: var(--wa-phone-height);
     padding: 0 var(--wa-phone-padding-x);
     font: inherit;
