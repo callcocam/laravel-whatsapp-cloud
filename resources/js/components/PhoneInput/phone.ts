@@ -6,10 +6,15 @@
  *
  * Este módulo é agnóstico de framework (não importa Vue) para poder ser
  * reutilizado por qualquer app, com ou sem design system.
+ *
+ * O componente separa o DDI (prefixo visual, ex.: `+55`) da parte editável
+ * (o número NACIONAL: DDD + número). Isso evita reconsumir os dígitos do DDI
+ * ao formatar — no Brasil o DDD também pode ser `55`, então misturar os dois
+ * num único texto gera ambiguidade e duplica o código do país.
  */
 
 export interface NormalizeOptions {
-    /** Código do país (DDI) a prepender quando o número vier sem ele. Padrão: Brasil (55). */
+    /** Código do país (DDI). Padrão: Brasil (55). */
     defaultCountry?: string
 }
 
@@ -18,68 +23,78 @@ export function onlyDigits(value: string | null | undefined): string {
     return String(value ?? '').replace(/\D+/g, '')
 }
 
+function ddiOf(options: NormalizeOptions = {}): string {
+    return onlyDigits(options.defaultCountry ?? '55') || '55'
+}
+
 /**
- * Normaliza um telefone digitado para o `wa_id` da Meta (dígitos puros).
- *
- * Regras (com `defaultCountry='55'`, padrão BR):
- *  1. Tira não-dígitos.
- *  2. Se já começa com o DDI e tem tamanho de número completo, mantém.
- *  3. Se veio só com DDD + número (10 ou 11 dígitos), prepende o DDI.
- *  4. Garante o 9º dígito do celular BR: se, após DDI+DDD, a parte local tem
- *     8 dígitos e começa com 6–9 (celular), insere o `9`.
- *
- * Números de outros países (defaultCountry != '55') sofrem apenas os passos 1–3,
- * sem a lógica do 9º dígito.
+ * Extrai o número NACIONAL (DDD + número) a partir de qualquer entrada,
+ * removendo o DDI quando presente. Limita a 11 dígitos (DDD 2 + celular 9).
  */
-export function normalizeMetaPhone(raw: string | null | undefined, options: NormalizeOptions = {}): string {
-    const ddi = onlyDigits(options.defaultCountry ?? '55') || '55'
+export function toNationalDigits(raw: string | null | undefined, options: NormalizeOptions = {}): string {
+    const ddi = ddiOf(options)
     let d = onlyDigits(raw)
 
     if (d === '') {
         return ''
     }
 
-    // Já contém o DDI e tem cauda plausível (DDD + número) → não prepende de novo.
-    const hasDdi = d.startsWith(ddi) && d.length >= ddi.length + 10
-
-    if (!hasDdi) {
-        // DDD (2) + número local (8 fixo ou 9 celular) = 10 ou 11 dígitos.
-        if (d.length === 10 || d.length === 11) {
-            d = ddi + d
-        } else if (d.length < 10) {
-            // Sem DDD reconhecível — prepende o DDI mesmo assim e deixa a validação decidir.
-            d = ddi + d
-        }
-        // length > 11 sem DDI conhecido: assume que já é internacional, mantém como está.
+    // Só remove o DDI quando o número é longo o suficiente para contê-lo
+    // (além dos 11 dígitos possíveis de um nacional). Assim um DDD igual ao
+    // DDI (ex.: 55) não é confundido com o código do país.
+    if (d.startsWith(ddi) && d.length > 11) {
+        d = d.slice(ddi.length)
     }
 
-    if (ddi === '55') {
-        d = ensureBrazilNinthDigit(d)
+    return d.slice(0, 11)
+}
+
+/**
+ * Garante o 9º dígito do celular BR num número nacional (DDD + número).
+ * Se o assinante tem 8 dígitos e começa com 6–9 (celular), insere o `9`.
+ */
+export function ensureBrazilNinthDigit(national: string): string {
+    const d = onlyDigits(national)
+
+    if (d.length !== 10) {
+        return d
+    }
+
+    const ddd = d.slice(0, 2)
+    const sub = d.slice(2) // 8 dígitos
+
+    if (/^[6-9]/.test(sub)) {
+        return `${ddd}9${sub}`
     }
 
     return d
 }
 
 /**
- * Insere o 9º dígito em celulares BR quando ausente.
- * Espera `55 + DDD(2) + local`. Se o local tem 8 dígitos e começa com 6–9,
- * vira 9 dígitos com o `9` na frente.
+ * Monta o `wa_id` (dígitos puros com DDI) a partir do número nacional.
+ * Aplica o 9º dígito do celular BR quando o DDI é 55.
  */
-export function ensureBrazilNinthDigit(waId: string): string {
-    const d = onlyDigits(waId)
+export function nationalToWaId(national: string | null | undefined, options: NormalizeOptions = {}): string {
+    const ddi = ddiOf(options)
+    let n = onlyDigits(national)
 
-    if (!d.startsWith('55') || d.length !== 12) {
-        return d
+    if (n === '') {
+        return ''
     }
 
-    const ddd = d.slice(2, 4)
-    const local = d.slice(4) // 8 dígitos
-
-    if (local.length === 8 && /^[6-9]/.test(local)) {
-        return `55${ddd}9${local}`
+    if (ddi === '55') {
+        n = ensureBrazilNinthDigit(n)
     }
 
-    return d
+    return ddi + n
+}
+
+/**
+ * Normaliza um telefone digitado (em qualquer forma) para o `wa_id` da Meta.
+ * Aceita entrada com ou sem DDI e devolve dígitos puros `DDI+DDD+número`.
+ */
+export function normalizeMetaPhone(raw: string | null | undefined, options: NormalizeOptions = {}): string {
+    return nationalToWaId(toNationalDigits(raw, options), options)
 }
 
 /** Valida o `wa_id` no mesmo critério do pacote em PHP: 8 a 15 dígitos. */
@@ -88,42 +103,51 @@ export function isValidMetaPhone(waId: string | null | undefined): boolean {
 }
 
 /**
- * Máscara de exibição a partir de dígitos.
- *  - Celular BR (55 + DDD + 9 dígitos): `+55 (48) 99999-9999`
- *  - Fixo BR    (55 + DDD + 8 dígitos): `+55 (48) 9999-9999`
- *  - Outros DDIs / tamanhos parciais: agrupamento simples com `+DDI ...`.
+ * Máscara de exibição do número NACIONAL (sem DDI): `(48) 99999-9999`.
+ * Usada no campo editável, onde o DDI aparece como prefixo à parte.
  */
-export function formatPhoneBR(raw: string | null | undefined): string {
+export function formatNationalBR(national: string | null | undefined): string {
+    const d = onlyDigits(national)
+
+    if (d === '') {
+        return ''
+    }
+
+    const ddd = d.slice(0, 2)
+    const sub = d.slice(2)
+
+    if (d.length <= 2) {
+        return `(${d}`
+    }
+    if (sub.length <= 4) {
+        return `(${ddd}) ${sub}`
+    }
+    if (sub.length <= 8) {
+        // Durante a digitação (ou fixo): 4+4.
+        return `(${ddd}) ${sub.slice(0, 4)}-${sub.slice(4)}`
+    }
+    // Celular (9 dígitos): 5+4.
+    return `(${ddd}) ${sub.slice(0, sub.length - 4)}-${sub.slice(-4)}`
+}
+
+/**
+ * Máscara de exibição a partir de um `wa_id` COMPLETO (com DDI): `+55 (48) 99999-9999`.
+ * Útil para exibir números já salvos fora do campo de edição.
+ */
+export function formatPhoneBR(raw: string | null | undefined, options: NormalizeOptions = {}): string {
     const d = onlyDigits(raw)
 
     if (d === '') {
         return ''
     }
 
-    if (d.startsWith('55')) {
-        const rest = d.slice(2)
-        const ddd = rest.slice(0, 2)
-        const local = rest.slice(2)
+    const ddi = ddiOf(options)
 
-        if (ddd === '') {
-            return '+55'
-        }
-        if (local === '') {
-            return `+55 (${ddd}`
-        }
-        if (local.length <= 4) {
-            return `+55 (${ddd}) ${local}`
-        }
-        if (local.length <= 8) {
-            // Fixo: 4+4
-            return `+55 (${ddd}) ${local.slice(0, 4)}-${local.slice(4)}`
-        }
-        // Celular: 5+4 (usa os últimos 4 como sufixo).
-        const head = local.slice(0, local.length - 4)
-        const tail = local.slice(-4)
-        return `+55 (${ddd}) ${head}-${tail}`
+    if (d.startsWith(ddi)) {
+        const national = d.slice(ddi.length)
+        const masked = formatNationalBR(national)
+        return masked === '' ? `+${ddi}` : `+${ddi} ${masked}`
     }
 
-    // Fallback para outros países: mostra `+` e os dígitos.
     return `+${d}`
 }
