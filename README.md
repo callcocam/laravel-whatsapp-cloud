@@ -27,6 +27,7 @@ pelo seu perfil:
 |---|---|---|
 | 🤖 **[Guia para agentes de IA](docs/AGENTS.md)** | Um agente (Claude Code, Copilot…) ou dev integrando o pacote | Mapa de arquivos, assinaturas exatas, contratos, invariantes, as 3 armadilhas do pacote, receita de integração e checklist anti-erro |
 | 👤 **[Guia do usuário](docs/GUIA-DO-USUARIO.md)** | Quem vai instalar, configurar e operar | Regras da Meta explicadas, onde achar cada credencial, ligar o webhook, criar templates, usar o painel e resolver os erros comuns |
+| 📝 **[Editar templates existentes](docs/EDITAR-TEMPLATES.md)** | Quem administra templates em uma WABA | Edição pelo mesmo ID/nome, estados permitidos, comando de terminal, validação e erros comuns |
 | 🧪 **[Sandbox](docs/SANDBOX.md)** | Quem vai testar um fluxo antes de soltar | Ensaiar a conversa inteira — inclusive o handoff pro responsável — sem um celular e **antes de submeter o template à Meta**. Janela de 24h e falhas da Meta de verdade. |
 
 ## Requisitos
