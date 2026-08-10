@@ -11,12 +11,15 @@ use Callcocam\WhatsAppCloud\Console\SendTemplate;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
+use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
+use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Support\NullSandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
 use Callcocam\WhatsAppCloud\Transport\CloudApiTransport;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
@@ -92,6 +95,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->registerRoutes();
         $this->registerPanelRoutes();
         $this->registerSandboxRoutes();
+        $this->registerInboundStore();
         $this->registerPublishing();
 
         if ($this->app->runningInConsole()) {
@@ -188,6 +192,20 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Log every inbound message to the store, unless the host opted out. The
+     * listener runs synchronously in the webhook request so a message survives
+     * a stopped queue.
+     */
+    protected function registerInboundStore(): void
+    {
+        if (! $this->app['config']->get('whatsapp-cloud.inbound.store', true)) {
+            return;
+        }
+
+        Event::listen(WhatsAppMessageReceived::class, StoreInboundMessage::class);
+    }
+
     protected function registerPublishing(): void
     {
         if (! $this->app->runningInConsole()) {
@@ -207,6 +225,11 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../database/migrations/2026_07_12_000000_create_whatsapp_sandbox_tables.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_sandbox_tables.php'),
         ], 'whatsapp-cloud-sandbox-migrations');
+
+        // The inbound message store (opt-out via `whatsapp-cloud.inbound.store`).
+        $this->publishes([
+            __DIR__.'/../database/migrations/2026_08_06_000000_create_whatsapp_inbound_messages_table.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_inbound_messages_table.php'),
+        ], 'whatsapp-cloud-inbound-migrations');
 
         // The panel's Vue pages must be compiled by the host app's Vite build, so
         // publish them into resources/js/pages/ where the Inertia page resolver

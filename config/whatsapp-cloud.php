@@ -70,6 +70,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Inbound message store
+    |--------------------------------------------------------------------------
+    |
+    | When `store` is on, the package logs every inbound message to the `model`'s
+    | table (publish + run the `whatsapp-cloud-inbound-migrations` migration
+    | first). It is written synchronously in the webhook request, so it survives
+    | a stopped queue; the host then moves each row's status as it acts on it.
+    |
+    */
+
+    'inbound' => [
+        'store' => env('WHATSAPP_CLOUD_STORE_INBOUND', true),
+        'model' => \Callcocam\WhatsAppCloud\Models\WhatsAppInboundMessage::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Webhook route
     |--------------------------------------------------------------------------
     |
