@@ -1,0 +1,24 @@
+{
+  "comment": "Copy this to settings.json to enable custom Claude Code settings for this project",
+  "mcp": {
+    "comment": "MCP servers configuration (optional - mcp.json is the default source)",
+    "meta-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-meta-devtools"
+      ],
+      "env": {
+        "DEBUG": "mcp:*",
+        "LOG_LEVEL": "info"
+      }
+    }
+  },
+  "permissions": {
+    "comment": "Allow specific tools without prompting",
+    "bash": true,
+    "read": true,
+    "edit": true,
+    "write": true
+  }
+}

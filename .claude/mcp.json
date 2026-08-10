@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "meta-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-meta-devtools"
+      ],
+      "env": {
+        "DEBUG": "mcp:*"
+      }
+    }
+  }
+}
