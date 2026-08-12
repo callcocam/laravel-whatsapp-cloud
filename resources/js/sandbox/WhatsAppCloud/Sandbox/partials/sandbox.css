@@ -427,20 +427,25 @@
     color: var(--accent-contrast);
 }
 
-.wa-sandbox .sb-input { display: flex; gap: 8px; }
+.wa-sandbox .sb-input { display: flex; gap: 8px; align-items: flex-end; }
 
-.wa-sandbox .sb-input input {
+.wa-sandbox .sb-input textarea {
     flex: 1;
     font: inherit;
     font-size: 14px;
+    line-height: 1.45;
     padding: 9px 12px;
-    border-radius: 999px;
+    border-radius: 18px;
     border: 1px solid var(--border);
     background: var(--surface-2);
     color: var(--text);
+    resize: none;
+    overflow-y: auto;
+    max-height: 160px;
+    min-height: 38px;
 }
 
-.wa-sandbox .sb-input input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.wa-sandbox .sb-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 .wa-sandbox .btn {
     font: inherit;

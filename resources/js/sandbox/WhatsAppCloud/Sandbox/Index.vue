@@ -88,6 +88,19 @@ function select(id) {
  * driven by the app's own code, and only needs a manual escape hatch. */
 const speaker = ref('contact')
 const draft = ref('')
+const composer = ref(null)
+
+/* The composer grows with the text instead of scrolling a single line away.
+ * Reset to auto first, or scrollHeight never shrinks back when you delete. */
+function resizeComposer() {
+    const el = composer.value
+    if (!el) return
+
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+}
+
+watch(draft, () => nextTick(resizeComposer))
 
 function say() {
     const text = draft.value.trim()
@@ -334,13 +347,15 @@ const withDays = computed(() => {
                         </div>
 
                         <div class="sb-input">
-                            <input
+                            <textarea
+                                ref="composer"
                                 v-model="draft"
+                                rows="1"
                                 :placeholder="speaker === 'contact'
                                     ? 'Responder como o contato…'
                                     : 'Texto livre do sistema (exige a janela aberta)…'"
-                                @keyup.enter="say"
-                            >
+                                @keydown.enter.exact.prevent="say"
+                            />
                             <button class="btn primary" :disabled="!draft.trim()" @click="say">Enviar</button>
                         </div>
 
