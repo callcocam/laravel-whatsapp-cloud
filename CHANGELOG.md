@@ -4,6 +4,8 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-26
+
 ### Added
 - **Setup wizard** at `/whatsapp/cloud/setup`: configure the whole integration from
   the browser. Validates the app id/secret against Meta before saving, generates the
