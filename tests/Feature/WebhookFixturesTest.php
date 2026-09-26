@@ -78,8 +78,10 @@ it('matches the interactive-button-reply fixture', function () {
 });
 
 it('matches the interactive-list-reply fixture', function () {
+    // A label that fits the 24-char title: sendInteractive() sends no
+    // description for it, so Meta echoes none back.
     assertFixture('interactive-list-reply', $this->factory->listReply(
-        'opt_0', 'Sábado de manhã', 'Sábado de manhã', replyTo: 'wamid.ORIGINAL',
+        'opt_0', 'Sábado de manhã', replyTo: 'wamid.ORIGINAL',
     ));
 });
 

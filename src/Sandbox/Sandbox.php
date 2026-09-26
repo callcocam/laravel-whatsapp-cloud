@@ -100,10 +100,32 @@ class Sandbox
     ): SimulatedWebhook {
         return $this->deliver(
             $conversation,
-            $this->factory($conversation)->listReply($id, $title, replyTo: $replyTo),
+            $this->factory($conversation)->listReply($id, $title, $this->rowDescription($conversation, $replyTo, $id), $replyTo),
             type: 'interactive',
             rendered: $title,
         );
+    }
+
+    /**
+     * The description of the tapped row, read from the list that was actually
+     * sent. Meta echoes a row's description in `list_reply` only when the row
+     * had one — so must the sandbox, or it would diverge from production.
+     */
+    protected function rowDescription(SandboxConversation $conversation, string $replyTo, string $id): ?string
+    {
+        $message = $conversation->messages()->where('wamid', $replyTo)->first();
+
+        foreach ((array) data_get($message?->envelope, 'interactive.action.sections', []) as $section) {
+            foreach ((array) data_get($section, 'rows', []) as $row) {
+                if ((string) data_get($row, 'id') === $id) {
+                    $description = data_get($row, 'description');
+
+                    return is_string($description) && $description !== '' ? $description : null;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -27,6 +27,13 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
   [docs/EMBEDDED-SIGNUP.md](docs/EMBEDDED-SIGNUP.md).
 
 ### Fixed
+- **Interactive list options no longer show their text twice.** `sendInteractive()`
+  sent every row's `description` — even when the label fit the 24-char title — so
+  WhatsApp printed title and description alike ("Confirmar / Confirmar") on the
+  list and on the person's reply. The description now goes only on labels longer
+  than 24 chars (the full label, still capped at 72). Row ids (`opt_N`) and
+  `InteractiveMessage` are unchanged. The sandbox's `list_reply` now echoes a
+  row's description only when the sent row had one, as Meta does.
 - **Sandbox: interactive reply buttons are tappable.** The screen only read
   `interactive.action.sections.0.rows`, so a message carrying reply BUTTONS rendered
   with no buttons at all and the rehearsal dead-ended on the very message that asked
