@@ -10,6 +10,7 @@ const props = defineProps({
     warnings: { type: Array, default: () => [] },
     loadError: { type: String, default: null },
     panelUrl: { type: String, required: true },
+    setupUrl: { type: String, default: null },
 })
 
 const pin = ref('')
@@ -203,6 +204,7 @@ onBeforeUnmount(() => window.removeEventListener('message', onMessage))
                 </div>
             </div>
             <div class="spacer" />
+            <a v-if="setupUrl" class="btn" :href="setupUrl">⚙️ Configuração</a>
             <input
                 v-if="signup.ready && !signup.pin_configured"
                 v-model="pin"
@@ -224,8 +226,8 @@ onBeforeUnmount(() => window.removeEventListener('message', onMessage))
 
         <main class="wrap">
             <div v-if="!signup.ready" class="card state error">
-                Para conectar números, defina <code>WHATSAPP_CLOUD_APP_ID</code>, <code>WHATSAPP_CLOUD_APP_SECRET</code> e
-                <code>WHATSAPP_CLOUD_EMBEDDED_SIGNUP_CONFIG_ID</code> no <code>.env</code>.
+                Para conectar números, configure o App ID, o App Secret e o config_id do Embedded Signup
+                <a v-if="setupUrl" :href="setupUrl">na tela de configuração</a><template v-else>no <code>.env</code></template>.
             </div>
 
             <div class="card">

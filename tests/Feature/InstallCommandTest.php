@@ -32,3 +32,9 @@ it('runs the install command and prints the checklist', function () {
 it('points the installer at the sandbox', function () {
     $this->artisan('whatsapp:install')->expectsOutputToContain('WHATSAPP_CLOUD_DRIVER=sandbox');
 });
+
+it('publishes the settings table and points at the setup wizard', function () {
+    $this->artisan('whatsapp:install')->expectsOutputToContain('whatsapp/cloud/setup');
+
+    expect(File::glob(database_path('migrations/*_create_whatsapp_settings_table.php')))->toHaveCount(1);
+});

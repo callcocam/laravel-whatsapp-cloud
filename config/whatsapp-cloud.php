@@ -195,6 +195,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Setup wizard + stored settings
+    |--------------------------------------------------------------------------
+    |
+    | A page that configures everything above from the browser — app id/secret,
+    | webhook (registered at Meta by API), Embedded Signup config_id, default
+    | number — plus diagnosis and JSON export/import.
+    |
+    | What it saves goes to the `whatsapp_settings` table, encrypted with the
+    | APP_KEY, and is layered over this file on boot: a value saved in the panel
+    | wins over the .env. Set `store` to false to ignore the table entirely.
+    | Queue workers read it at boot — `queue:restart` after changing it.
+    |
+    | The wizard reads and exports SECRETS: keep it behind an admin gate.
+    |
+    */
+
+    'setup' => [
+        'enabled' => env('WHATSAPP_CLOUD_SETUP_ENABLED', true),
+        'store' => env('WHATSAPP_CLOUD_SETTINGS_STORE', true),
+        'prefix' => env('WHATSAPP_CLOUD_SETUP_PREFIX', 'whatsapp/cloud/setup'),
+        'name' => 'whatsapp.cloud.setup',
+        'middleware' => ['web', 'auth'],
+        'gate' => env('WHATSAPP_CLOUD_SETUP_GATE', env('WHATSAPP_CLOUD_PANEL_GATE')),
+        'component' => env('WHATSAPP_CLOUD_SETUP_COMPONENT', 'WhatsAppCloud/Setup/Index'),
+
+        // Written by the wizard once Meta accepted the webhook subscription.
+        'webhook_subscribed_at' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sandbox (simulator)
     |--------------------------------------------------------------------------
     |

@@ -41,6 +41,9 @@ acesso avançado a `whatsapp_business_management` e `whatsapp_business_messaging
 
 ## Configuração no app Laravel
 
+> Mais fácil: use o assistente em `/whatsapp/cloud/setup`
+> ([docs/CONFIGURACAO.md](CONFIGURACAO.md)) — ele salva tudo abaixo pelo painel.
+
 ```bash
 php artisan vendor:publish --tag=whatsapp-cloud-embedded-signup-migrations
 php artisan vendor:publish --tag=whatsapp-cloud-inertia --force   # traz a página Numbers

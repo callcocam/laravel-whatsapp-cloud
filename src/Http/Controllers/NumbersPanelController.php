@@ -13,6 +13,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -62,6 +63,7 @@ class NumbersPanelController
             // does not share `flash` through its Inertia middleware.
             'warnings' => array_values((array) $request->session()->get(self::WARNINGS_KEY, [])),
             'panelUrl' => route($this->routeName('index')),
+            'setupUrl' => Route::has($setup = config('whatsapp-cloud.setup.name', 'whatsapp.cloud.setup').'.index') ? route($setup) : null,
         ]);
     }
 

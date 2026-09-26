@@ -25,6 +25,11 @@ class InstallCommand extends Command
             '--force' => $force,
         ]) === self::SUCCESS);
 
+        $this->components->task('Publishing settings migration', fn () => $this->callSilently('vendor:publish', [
+            '--tag' => 'whatsapp-cloud-settings-migrations',
+            '--force' => $force,
+        ]) === self::SUCCESS);
+
         $hasInertia = class_exists(Inertia::class);
 
         if ($hasInertia) {
@@ -49,6 +54,9 @@ class InstallCommand extends Command
         ];
 
         if ($hasInertia) {
+            array_unshift($checklist, 'Easiest path: after migrating, browse /'
+                .ltrim((string) config('whatsapp-cloud.setup.prefix', 'whatsapp/cloud/setup'), '/')
+                .' — a wizard that validates the Meta app, registers the webhook, connects a number and sends a test (docs/CONFIGURACAO.md). Set WHATSAPP_CLOUD_SETUP_GATE first.');
             $checklist[] = 'For a NATIVE UI in your own design system (shadcn-vue), run `php artisan whatsapp:panel:scaffold` and point `panel.component` at it.';
             $checklist[] = 'Connect numbers without copying tokens: publish `whatsapp-cloud-embedded-signup-migrations`, migrate, set WHATSAPP_CLOUD_APP_ID + WHATSAPP_CLOUD_EMBEDDED_SIGNUP_CONFIG_ID and browse /'
                 .ltrim((string) config('whatsapp-cloud.embedded_signup.prefix', 'whatsapp/cloud/numbers'), '/').' — see docs/EMBEDDED-SIGNUP.md.';

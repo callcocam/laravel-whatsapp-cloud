@@ -17,6 +17,7 @@ use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
+use Callcocam\WhatsAppCloud\Settings\SettingsStore;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Support\NullSandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
@@ -63,6 +64,8 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
 
         $this->app->alias(WhatsAppManager::class, 'whatsapp-cloud');
 
+        $this->app->singleton(SettingsStore::class, fn ($app) => new SettingsStore($app['config']));
+
         $this->app->bind(EmbeddedSignup::class, fn ($app) => new EmbeddedSignup(
             graphVersion: (string) $app['config']->get('whatsapp-cloud.graph_version', 'v21.0'),
             appId: $app['config']->get('whatsapp-cloud.app_id'),
@@ -101,9 +104,11 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->applyStoredSettings();
         $this->registerRoutes();
         $this->registerPanelRoutes();
         $this->registerNumbersRoutes();
+        $this->registerSetupRoutes();
         $this->registerSandboxRoutes();
         $this->registerInboundStore();
         $this->registerPublishing();
@@ -168,6 +173,52 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
             'as' => $config->get('whatsapp-cloud.panel.name', 'whatsapp.cloud.panel').'.',
         ], function () {
             $this->loadRoutesFrom(__DIR__.'/../routes/panel.php');
+        });
+    }
+
+    /**
+     * Layer the values saved from the setup wizard over the config, before
+     * anything reads it. A no-op until the settings table exists.
+     */
+    protected function applyStoredSettings(): void
+    {
+        if (! $this->app['config']->get('whatsapp-cloud.setup.store', true)) {
+            return;
+        }
+
+        // Never bake panel secrets into bootstrap/cache/config.php: they would
+        // outlive a change made in the panel, in plain text.
+        if ($this->app->runningInConsole() && in_array($_SERVER['argv'][1] ?? null, ['config:cache', 'optimize'], true)) {
+            return;
+        }
+
+        $this->app->make(SettingsStore::class)->apply();
+    }
+
+    /**
+     * Register the setup wizard. Same conditions as the other pages: enabled
+     * AND Inertia installed.
+     */
+    protected function registerSetupRoutes(): void
+    {
+        $config = $this->app['config'];
+
+        if (! $config->get('whatsapp-cloud.setup.enabled', true) || ! class_exists(Inertia::class)) {
+            return;
+        }
+
+        $middleware = (array) $config->get('whatsapp-cloud.setup.middleware', ['web', 'auth']);
+
+        if ($gate = $config->get('whatsapp-cloud.setup.gate')) {
+            $middleware[] = 'can:'.$gate;
+        }
+
+        Route::group([
+            'prefix' => $config->get('whatsapp-cloud.setup.prefix', 'whatsapp/cloud/setup'),
+            'middleware' => $middleware,
+            'as' => $config->get('whatsapp-cloud.setup.name', 'whatsapp.cloud.setup').'.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__.'/../routes/setup.php');
         });
     }
 
@@ -263,6 +314,11 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../database/migrations/2026_09_26_000000_add_embedded_signup_columns_to_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His', time() + 1).'_add_embedded_signup_columns_to_whatsapp_numbers_table.php'),
         ], 'whatsapp-cloud-embedded-signup-migrations');
+
+        // Settings saved from the setup wizard (encrypted).
+        $this->publishes([
+            __DIR__.'/../database/migrations/2026_09_27_000000_create_whatsapp_settings_table.php' => database_path('migrations/'.date('Y_m_d_His', time() + 2).'_create_whatsapp_settings_table.php'),
+        ], 'whatsapp-cloud-settings-migrations');
 
         // A separate tag, so an app that only sends messages never acquires the
         // sandbox tables.

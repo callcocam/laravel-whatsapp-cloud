@@ -5,6 +5,16 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 ## [Unreleased]
 
 ### Added
+- **Setup wizard** at `/whatsapp/cloud/setup`: configure the whole integration from
+  the browser. Validates the app id/secret against Meta before saving, generates the
+  verify token and registers the webhook by API, stores the Embedded Signup
+  `config_id`, connects a number (Embedded Signup or manual, checked against its
+  WABA) and makes it the default, then sends a test template and shows the reply
+  arriving through the webhook. "Validar tudo" re-checks every piece against Meta.
+  Values are saved encrypted in `whatsapp_settings` (tag
+  `whatsapp-cloud-settings-migrations`) and layered over the config on boot — a
+  value saved in the panel wins over the .env. JSON export/import carries the
+  configuration between projects. See [docs/CONFIGURACAO.md](docs/CONFIGURACAO.md).
 - **Connected numbers + Embedded Signup.** A page at `/whatsapp/cloud/numbers` where a
   business connects its WhatsApp number by logging in with Facebook — no copying ids
   and tokens by hand. The server exchanges the code, checks the number belongs to the
