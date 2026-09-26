@@ -12,6 +12,7 @@ use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
+use Callcocam\WhatsAppCloud\Http\Middleware\RequireConfiguredGate;
 use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
@@ -209,9 +210,9 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
 
         $middleware = (array) $config->get('whatsapp-cloud.setup.middleware', ['web', 'auth']);
 
-        if ($gate = $config->get('whatsapp-cloud.setup.gate')) {
-            $middleware[] = 'can:'.$gate;
-        }
+        // The wizard reads and exports every secret: never on `auth` alone.
+        $gate = $config->get('whatsapp-cloud.setup.gate');
+        $middleware[] = filled($gate) ? 'can:'.$gate : RequireConfiguredGate::class.':WHATSAPP_CLOUD_SETUP_GATE';
 
         Route::group([
             'prefix' => $config->get('whatsapp-cloud.setup.prefix', 'whatsapp/cloud/setup'),
@@ -236,9 +237,9 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
 
         $middleware = (array) $config->get('whatsapp-cloud.embedded_signup.middleware', ['web', 'auth']);
 
-        if ($gate = $config->get('whatsapp-cloud.embedded_signup.gate')) {
-            $middleware[] = 'can:'.$gate;
-        }
+        // Connecting a number hands out a token over a WABA: never on `auth` alone.
+        $gate = $config->get('whatsapp-cloud.embedded_signup.gate');
+        $middleware[] = filled($gate) ? 'can:'.$gate : RequireConfiguredGate::class.':WHATSAPP_CLOUD_NUMBERS_GATE';
 
         Route::group([
             'prefix' => $config->get('whatsapp-cloud.embedded_signup.prefix', 'whatsapp/cloud/numbers'),

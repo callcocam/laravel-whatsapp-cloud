@@ -48,7 +48,9 @@ it('validates the app against Meta before saving it, encrypted', function () {
         ->assertSessionHasNoErrors()
         ->assertSessionHas('whatsapp_cloud_setup_notice', fn ($n) => str_contains($n['message'], 'noazul'));
 
-    Http::assertSent(fn (Request $r) => $r['access_token'] === '111|sec');
+    // The app token goes in the header, never in the URL.
+    Http::assertSent(fn (Request $r) => $r->hasHeader('Authorization', 'Bearer 111|sec')
+        && ! str_contains($r->url(), 'access_token'));
 
     expect(config('whatsapp-cloud.app_id'))->toBe('111')
         ->and(config('whatsapp-cloud.app_secret'))->toBe('sec')
@@ -84,7 +86,7 @@ it('registers the webhook by API with a generated verify token that the webhook 
         && $r['callback_url'] === 'https://app.test/webhooks/whatsapp/cloud'
         && $r['verify_token'] === $token
         && $r['fields'] === 'messages'
-        && $r['access_token'] === '111|sec');
+        && $r->hasHeader('Authorization', 'Bearer 111|sec'));
 
     // The handshake Meta performs during that call succeeds with the stored token.
     $this->get('webhooks/whatsapp/cloud?hub_mode=subscribe&hub_verify_token='.$token.'&hub_challenge=42')
@@ -201,6 +203,7 @@ it('exports the effective configuration and imports it back', function () {
     store()->put(['app_id' => '111', 'app_secret' => 'sec', 'embedded_signup_config_id' => '999']);
 
     $response = $this->get(setupUrl('/export'))->assertOk();
+    expect($response->headers->get('Cache-Control'))->toContain('no-store');
     $json = $response->streamedContent();
     $data = json_decode($json, true);
 
@@ -226,4 +229,24 @@ it('rejects an import with unknown keys', function () {
         ->assertSessionHasErrors('form');
 
     expect(WhatsAppSetting::query()->count())->toBe(0);
+});
+
+it('refuses to open without a gate outside the local environment', function () {
+    // Any non-local environment (not 'production': that makes migrations prompt).
+    app()['env'] = 'staging';
+
+    $this->get(setupUrl())
+        ->assertForbidden()
+        ->assertSee('WHATSAPP_CLOUD_SETUP_GATE');
+
+    $this->get('whatsapp/cloud/numbers')
+        ->assertForbidden()
+        ->assertSee('WHATSAPP_CLOUD_NUMBERS_GATE');
+});
+
+it('opens behind a configured gate even though a UI token is set (browser pages cannot send it)', function () {
+    config(['whatsapp-cloud.panel.ui_token' => 'abc']);
+
+    $this->get(setupUrl())->assertOk();
+    $this->get('whatsapp/cloud/numbers')->assertOk();
 });

@@ -13,7 +13,9 @@ php artisan migrate
 npm run build
 ```
 
-Antes de abrir a tela, **restrinja o acesso** — ela lê e exporta segredos:
+Antes de abrir a tela, **defina um gate** — ela lê e exporta segredos. Sem gate,
+a tela (e a de números conectados) **só abre no ambiente `local`**; em produção
+responde 403 dizendo qual variável falta:
 
 ```dotenv
 WHATSAPP_CLOUD_SETUP_GATE=manage-whatsapp   # cai no WHATSAPP_CLOUD_PANEL_GATE se vazio

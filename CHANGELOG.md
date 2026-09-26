@@ -15,6 +15,9 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
   `whatsapp-cloud-settings-migrations`) and layered over the config on boot — a
   value saved in the panel wins over the .env. JSON export/import carries the
   configuration between projects. See [docs/CONFIGURACAO.md](docs/CONFIGURACAO.md).
+  The setup and connected-numbers pages need a gate (`WHATSAPP_CLOUD_SETUP_GATE` /
+  `WHATSAPP_CLOUD_NUMBERS_GATE`, falling back to `WHATSAPP_CLOUD_PANEL_GATE`); without
+  one they only open in the local environment.
 - **Connected numbers + Embedded Signup.** A page at `/whatsapp/cloud/numbers` where a
   business connects its WhatsApp number by logging in with Facebook — no copying ids
   and tokens by hand. The server exchanges the code, checks the number belongs to the

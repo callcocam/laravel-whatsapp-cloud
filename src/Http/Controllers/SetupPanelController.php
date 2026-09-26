@@ -6,7 +6,6 @@ use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppException;
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppNotConfiguredException;
-use Callcocam\WhatsAppCloud\Http\Controllers\Concerns\GuardsPanelUiToken;
 use Callcocam\WhatsAppCloud\Models\WhatsAppInboundMessage;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
@@ -39,8 +38,6 @@ use Throwable;
  */
 class SetupPanelController
 {
-    use GuardsPanelUiToken;
-
     private const NOTICE_KEY = 'whatsapp_cloud_setup_notice';
 
     private const DIAGNOSTICS_KEY = 'whatsapp_cloud_setup_diagnostics';
@@ -49,8 +46,6 @@ class SetupPanelController
 
     public function index(Request $request): InertiaResponse
     {
-        $this->guardUiToken($request);
-
         $numbers = $this->numbers();
         $defaultPhone = (string) config('whatsapp-cloud.default.phone_number_id');
         $lastInbound = $this->lastInbound();
@@ -87,8 +82,6 @@ class SetupPanelController
      */
     public function saveApp(Request $request): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $appId = trim((string) $request->input('app_id', ''));
         $secret = trim((string) $request->input('app_secret', '')) ?: (string) config('whatsapp-cloud.app_secret');
         $version = trim((string) $request->input('graph_version', '')) ?: (string) config('whatsapp-cloud.graph_version', 'v21.0');
@@ -116,8 +109,6 @@ class SetupPanelController
      */
     public function subscribeWebhook(Request $request): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $callback = trim((string) $request->input('callback_url', '')) ?: $this->callbackUrl();
 
         if ($callback === null || ! str_starts_with($callback, 'https://') || filter_var($callback, FILTER_VALIDATE_URL) === false) {
@@ -143,8 +134,6 @@ class SetupPanelController
      */
     public function saveSignup(Request $request): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $configId = trim((string) $request->input('config_id', ''));
         $pin = trim((string) $request->input('register_pin', ''));
 
@@ -167,8 +156,6 @@ class SetupPanelController
      */
     public function saveNumber(Request $request, EmbeddedSignup $signup): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $phoneNumberId = trim((string) $request->input('phone_number_id', ''));
         $wabaId = trim((string) $request->input('waba_id', ''));
         $token = trim((string) $request->input('access_token', ''));
@@ -213,8 +200,6 @@ class SetupPanelController
      */
     public function setDefault(Request $request, string $number): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $record = $this->model()::query()->find($number);
         abort_unless($record instanceof WhatsAppCredentials, 404);
 
@@ -228,8 +213,6 @@ class SetupPanelController
      */
     public function sendTest(Request $request, WhatsAppManager $whatsapp): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $to = preg_replace('/\D+/', '', (string) $request->input('to', '')) ?? '';
         $template = trim((string) $request->input('template', '')) ?: 'hello_world';
         $language = trim((string) $request->input('language', '')) ?: 'en_US';
@@ -251,8 +234,6 @@ class SetupPanelController
      */
     public function diagnose(Request $request, EmbeddedSignup $signup): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $checks = [];
 
         $check = function (string $label, callable $probe) use (&$checks): void {
@@ -340,8 +321,6 @@ class SetupPanelController
      */
     public function export(Request $request): StreamedResponse
     {
-        $this->guardUiToken($request);
-
         $settings = $this->settings->effective();
         unset($settings['webhook_subscribed_at']);
 
@@ -352,6 +331,7 @@ class SetupPanelController
 
         return response()->streamDownload(fn () => print ($json), 'whatsapp-cloud.json', [
             'Content-Type' => 'application/json',
+            'Cache-Control' => 'no-store',
         ]);
     }
 
@@ -361,8 +341,6 @@ class SetupPanelController
      */
     public function import(Request $request): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $raw = $request->hasFile('file')
             ? (string) file_get_contents((string) $request->file('file')?->getRealPath())
             : (string) $request->input('json', '');

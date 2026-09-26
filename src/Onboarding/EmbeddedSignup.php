@@ -118,12 +118,19 @@ class EmbeddedSignup
     }
 
     /**
-     * Stop receiving the WABA's webhooks and forget the number. The unsubscribe
-     * is best-effort: a revoked token must not keep a dead row around.
+     * Forget the number, and stop receiving its WABA's webhooks when no other
+     * stored number shares that WABA — the subscription is per WABA, not per
+     * number. The unsubscribe is best-effort: a revoked token must not keep a
+     * dead row around.
      */
     public function disconnect(Model&WhatsAppCredentials $number): void
     {
-        if (filled($number->wabaId())) {
+        $sharesWaba = filled($number->wabaId()) && $this->model::query()
+            ->where('waba_id', $number->wabaId())
+            ->whereKeyNot($number->getKey())
+            ->exists();
+
+        if (filled($number->wabaId()) && ! $sharesWaba) {
             try {
                 $this->handle(fn () => $this->request($number->accessToken())
                     ->delete("{$number->wabaId()}/subscribed_apps"));

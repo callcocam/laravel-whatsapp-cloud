@@ -5,9 +5,9 @@ namespace Callcocam\WhatsAppCloud\Http\Controllers;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppException;
-use Callcocam\WhatsAppCloud\Http\Controllers\Concerns\GuardsPanelUiToken;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
+use Callcocam\WhatsAppCloud\Settings\SettingsStore;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -25,14 +25,10 @@ use Inertia\Response as InertiaResponse;
  */
 class NumbersPanelController
 {
-    use GuardsPanelUiToken;
-
     private const WARNINGS_KEY = 'whatsapp_cloud_numbers_warnings';
 
     public function index(Request $request): InertiaResponse
     {
-        $this->guardUiToken($request);
-
         $numbers = [];
         $loadError = null;
 
@@ -73,8 +69,6 @@ class NumbersPanelController
      */
     public function store(Request $request, EmbeddedSignup $signup): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $code = trim((string) $request->input('code', ''));
         $wabaId = trim((string) $request->input('waba_id', ''));
         $phoneNumberId = trim((string) $request->input('phone_number_id', ''));
@@ -107,19 +101,20 @@ class NumbersPanelController
      */
     public function refresh(Request $request, string $number, EmbeddedSignup $signup): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $record = $this->find($number);
 
         return $this->run(fn (): RedirectResponse => $this->ok('Número atualizado.', $signup->refresh($record)));
     }
 
-    public function destroy(Request $request, string $number, EmbeddedSignup $signup): RedirectResponse
+    public function destroy(Request $request, string $number, EmbeddedSignup $signup, SettingsStore $settings): RedirectResponse
     {
-        $this->guardUiToken($request);
-
         $record = $this->find($number);
         $signup->disconnect($record);
+
+        // A disconnected number must not stay behind as the default sender.
+        if ($settings->get('default_phone_number_id') === $record->phoneNumberId()) {
+            $settings->put(['default_phone_number_id' => null, 'default_waba_id' => null, 'default_access_token' => null]);
+        }
 
         return $this->ok('Número desconectado.');
     }

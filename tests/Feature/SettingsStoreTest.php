@@ -41,3 +41,12 @@ it('leaves the config alone when the table does not exist', function () {
 it('refuses unknown keys', function () {
     app(SettingsStore::class)->put(['nope' => 'x']);
 })->throws(InvalidArgumentException::class);
+
+it('writes nothing when one of the keys is unknown', function () {
+    try {
+        app(SettingsStore::class)->put(['app_id' => '1', 'nope' => 'x']);
+    } catch (InvalidArgumentException) {
+    }
+
+    expect(WhatsAppSetting::query()->count())->toBe(0);
+});

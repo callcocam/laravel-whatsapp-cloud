@@ -15,6 +15,7 @@ const props = defineProps({
 
 const pin = ref('')
 const connecting = ref(false)
+const submitted = ref(false)
 
 // FB.login returns the `code`; the popup posts the WABA / phone ids in a
 // separate window message. They arrive in either order — submit once both are in.
@@ -68,7 +69,7 @@ function onMessage(event) {
 }
 
 async function connect() {
-    if (!props.signup.ready) return
+    if (!props.signup.ready || connecting.value) return
     if (pin.value && !/^\d{6}$/.test(pin.value)) {
         pushToast('O PIN precisa ter exatamente 6 dígitos.', 'err')
         return
@@ -76,6 +77,7 @@ async function connect() {
 
     session.code = null
     session.data = null
+    submitted.value = false
     connecting.value = true
 
     let FB
@@ -106,8 +108,8 @@ async function connect() {
 }
 
 function submit() {
-    if (!connecting.value || !session.code || !session.data) return
-    connecting.value = false
+    if (!connecting.value || submitted.value || !session.code || !session.data) return
+    submitted.value = true
 
     router.post(
         props.panelUrl,
@@ -122,13 +124,15 @@ function submit() {
             preserveScroll: true,
             onSuccess: () => pushToast('Número conectado.'),
             onError: (errors) => pushToast(errors.meta || errors.form || 'Falha ao conectar.', 'err'),
+            onFinish: () => (connecting.value = false),
         },
     )
 }
 
 function fail(message) {
     // CANCEL arrives as a message AND as an empty FB.login callback — toast once.
-    if (!connecting.value) return
+    // Once the POST is out, late popup events no longer matter.
+    if (!connecting.value || submitted.value) return
     connecting.value = false
     pushToast(message, 'err')
 }

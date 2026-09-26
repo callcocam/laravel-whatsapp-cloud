@@ -34,7 +34,6 @@ class MetaAppClient
     {
         $response = $this->handle(fn () => $this->client()->get($this->appId, [
             'fields' => 'id,name',
-            'access_token' => $this->appToken(),
         ]));
 
         $name = $response->json('name');
@@ -56,7 +55,6 @@ class MetaAppClient
             'verify_token' => $verifyToken,
             'fields' => 'messages',
             'include_values' => 'true',
-            'access_token' => $this->appToken(),
         ]));
     }
 
@@ -67,9 +65,7 @@ class MetaAppClient
      */
     public function webhookSubscription(): ?array
     {
-        $response = $this->handle(fn () => $this->client()->get("{$this->appId}/subscriptions", [
-            'access_token' => $this->appToken(),
-        ]));
+        $response = $this->handle(fn () => $this->client()->get("{$this->appId}/subscriptions"));
 
         foreach ((array) $response->json('data', []) as $subscription) {
             if (is_array($subscription) && ($subscription['object'] ?? null) === 'whatsapp_business_account') {
@@ -89,7 +85,6 @@ class MetaAppClient
     {
         $response = $this->handle(fn () => $this->client()->get('debug_token', [
             'input_token' => $token,
-            'access_token' => $this->appToken(),
         ]));
 
         return (array) $response->json('data', []);
@@ -118,9 +113,14 @@ class MetaAppClient
         return $response;
     }
 
+    /**
+     * The app token rides in the Authorization header, never in the URL, where
+     * it would end up in proxy and server logs.
+     */
     protected function client(): PendingRequest
     {
         return Http::baseUrl("https://graph.facebook.com/{$this->graphVersion}")
+            ->withToken($this->appToken())
             ->acceptJson()
             ->timeout(30);
     }

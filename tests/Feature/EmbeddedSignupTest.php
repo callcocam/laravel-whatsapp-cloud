@@ -2,6 +2,7 @@
 
 use Callcocam\WhatsAppCloud\Events\WhatsAppNumberConnected;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
+use Callcocam\WhatsAppCloud\Settings\SettingsStore;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
@@ -243,4 +244,33 @@ it('404s an unknown number', function () {
 
 it('registers the page under the default prefix', function () {
     expect(route('whatsapp.cloud.numbers.index', absolute: false))->toBe('/whatsapp/cloud/numbers');
+});
+
+it('keeps the WABA subscription while another number still uses it', function () {
+    $a = WhatsAppNumber::query()->create(['phone_number_id' => '777', 'waba_id' => '555', 'cloud_access_token' => 't']);
+    WhatsAppNumber::query()->create(['phone_number_id' => '778', 'waba_id' => '555', 'cloud_access_token' => 't']);
+    Http::fake();
+
+    $this->delete(numbersUrl("/{$a->id}"))->assertRedirect();
+
+    Http::assertNothingSent();
+    expect(WhatsAppNumber::query()->pluck('phone_number_id')->all())->toBe(['778']);
+});
+
+it('clears the default sender when the default number is disconnected', function () {
+    $number = WhatsAppNumber::query()->create(['phone_number_id' => '777', 'waba_id' => '555', 'cloud_access_token' => 'tok']);
+    $other = WhatsAppNumber::query()->create(['phone_number_id' => '888', 'waba_id' => '444', 'cloud_access_token' => 'tk2']);
+    $settings = app(SettingsStore::class);
+    $settings->put(['default_phone_number_id' => '777', 'default_waba_id' => '555', 'default_access_token' => 'tok']);
+    Http::fake(['graph.facebook.com/*' => Http::response(['success' => true])]);
+
+    // Disconnecting another number leaves the default alone...
+    $this->delete(numbersUrl("/{$other->id}"))->assertRedirect();
+    expect($settings->get('default_phone_number_id'))->toBe('777');
+
+    // ...disconnecting the default one hands the sender back to the .env.
+    $this->delete(numbersUrl("/{$number->id}"))->assertRedirect();
+    expect($settings->get('default_phone_number_id'))->toBeNull()
+        ->and($settings->get('default_access_token'))->toBeNull()
+        ->and(config('whatsapp-cloud.default.phone_number_id'))->toBe('111222333');
 });

@@ -4,6 +4,7 @@ namespace Callcocam\WhatsAppCloud\Settings;
 
 use Callcocam\WhatsAppCloud\Models\WhatsAppSetting;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Throwable;
 
@@ -121,19 +122,25 @@ class SettingsStore
      */
     public function put(array $values): void
     {
-        foreach ($values as $key => $value) {
+        foreach (array_keys($values) as $key) {
             if (! array_key_exists($key, self::KEYS)) {
                 throw new InvalidArgumentException("Unknown WhatsApp setting [{$key}].");
             }
-
-            if (blank($value)) {
-                WhatsAppSetting::query()->where('key', $key)->delete();
-
-                continue;
-            }
-
-            WhatsAppSetting::query()->updateOrCreate(['key' => $key], ['value' => trim((string) $value)]);
         }
+
+        // Related keys (app id + secret, the default number's three) change
+        // together or not at all.
+        DB::transaction(function () use ($values) {
+            foreach ($values as $key => $value) {
+                if (blank($value)) {
+                    WhatsAppSetting::query()->where('key', $key)->delete();
+
+                    continue;
+                }
+
+                WhatsAppSetting::query()->updateOrCreate(['key' => $key], ['value' => trim((string) $value)]);
+            }
+        });
 
         $this->stored = null;
         $this->apply();

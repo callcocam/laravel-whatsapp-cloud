@@ -188,7 +188,8 @@ return [
         'name' => 'whatsapp.cloud.numbers',
         'middleware' => ['web', 'auth'],
         // Connecting a number grants a token over a WABA: gate it. Falls back to
-        // the template panel's gate.
+        // the template panel's gate. With no gate at all the page only opens in
+        // the local environment (403 elsewhere).
         'gate' => env('WHATSAPP_CLOUD_NUMBERS_GATE', env('WHATSAPP_CLOUD_PANEL_GATE')),
         'component' => env('WHATSAPP_CLOUD_NUMBERS_COMPONENT', 'WhatsAppCloud/Numbers/Index'),
     ],
@@ -207,7 +208,8 @@ return [
     | wins over the .env. Set `store` to false to ignore the table entirely.
     | Queue workers read it at boot — `queue:restart` after changing it.
     |
-    | The wizard reads and exports SECRETS: keep it behind an admin gate.
+    | The wizard reads and exports SECRETS: keep it behind an admin gate. With
+    | no gate configured it only opens in the local environment (403 elsewhere).
     |
     */
 

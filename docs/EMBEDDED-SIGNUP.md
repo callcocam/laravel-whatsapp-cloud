@@ -65,7 +65,7 @@ WHATSAPP_CLOUD_NUMBERS_GATE=manage-whatsapp
 ```
 
 A página fica em **`/whatsapp/cloud/numbers`** (`WHATSAPP_CLOUD_NUMBERS_PREFIX`),
-atrás de `['web', 'auth']` + o gate, se configurado.
+atrás de `['web', 'auth']` + o gate. Sem gate, só abre no ambiente `local` (403 nos demais).
 
 ## Usar os números conectados para enviar
 
@@ -83,7 +83,10 @@ $this->app->bind(WhatsAppCredentialsResolver::class, fn () =>
 
 ### Multi-tenant: ligar o número ao tenant
 
-O pacote não sabe de qual tenant é o número. Ouça o evento e preencha a `key`:
+O pacote não sabe de qual tenant é o número. Ouça o evento e preencha a `key`.
+O evento dispara dentro do `POST /numbers`, com o usuário autenticado — garanta
+(no gate ou num middleware) que só chega ali quem tem um time atual, para o
+número nunca ficar sem dono:
 
 ```php
 use Callcocam\WhatsAppCloud\Events\WhatsAppNumberConnected;
