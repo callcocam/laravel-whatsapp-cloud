@@ -4,6 +4,18 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Added
+- **Connected numbers + Embedded Signup.** A page at `/whatsapp/cloud/numbers` where a
+  business connects its WhatsApp number by logging in with Facebook — no copying ids
+  and tokens by hand. The server exchanges the code, checks the number belongs to the
+  WABA, subscribes the app to the WABA's webhooks, optionally registers the number
+  with a PIN and stores it on `whatsapp-cloud.model`. Numbers can be refreshed and
+  disconnected from the same page. Fires `WhatsAppNumberConnected` so a multi-tenant
+  app can tie the row to its tenant. Config under `whatsapp-cloud.embedded_signup`
+  (`WHATSAPP_CLOUD_EMBEDDED_SIGNUP_CONFIG_ID`); new columns in the
+  `whatsapp-cloud-embedded-signup-migrations` tag. See
+  [docs/EMBEDDED-SIGNUP.md](docs/EMBEDDED-SIGNUP.md).
+
 ### Fixed
 - **Sandbox: interactive reply buttons are tappable.** The screen only read
   `interactive.action.sections.0.rows`, so a message carrying reply BUTTONS rendered

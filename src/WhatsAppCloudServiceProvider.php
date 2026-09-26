@@ -13,6 +13,8 @@ use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
+use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
+use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
@@ -60,6 +62,13 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         ));
 
         $this->app->alias(WhatsAppManager::class, 'whatsapp-cloud');
+
+        $this->app->bind(EmbeddedSignup::class, fn ($app) => new EmbeddedSignup(
+            graphVersion: (string) $app['config']->get('whatsapp-cloud.graph_version', 'v21.0'),
+            appId: $app['config']->get('whatsapp-cloud.app_id'),
+            appSecret: $app['config']->get('whatsapp-cloud.app_secret'),
+            model: $app['config']->get('whatsapp-cloud.model', WhatsAppNumber::class),
+        ));
     }
 
     /**
@@ -94,6 +103,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
     {
         $this->registerRoutes();
         $this->registerPanelRoutes();
+        $this->registerNumbersRoutes();
         $this->registerSandboxRoutes();
         $this->registerInboundStore();
         $this->registerPublishing();
@@ -162,6 +172,33 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
     }
 
     /**
+     * Register the connected-numbers page (Embedded Signup). Same conditions as
+     * the template panel: enabled AND Inertia installed.
+     */
+    protected function registerNumbersRoutes(): void
+    {
+        $config = $this->app['config'];
+
+        if (! $config->get('whatsapp-cloud.embedded_signup.enabled', true) || ! class_exists(Inertia::class)) {
+            return;
+        }
+
+        $middleware = (array) $config->get('whatsapp-cloud.embedded_signup.middleware', ['web', 'auth']);
+
+        if ($gate = $config->get('whatsapp-cloud.embedded_signup.gate')) {
+            $middleware[] = 'can:'.$gate;
+        }
+
+        Route::group([
+            'prefix' => $config->get('whatsapp-cloud.embedded_signup.prefix', 'whatsapp/cloud/numbers'),
+            'middleware' => $middleware,
+            'as' => $config->get('whatsapp-cloud.embedded_signup.name', 'whatsapp.cloud.numbers').'.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__.'/../routes/numbers.php');
+        });
+    }
+
+    /**
      * Register the sandbox screen.
      *
      * The guard runs both ways, because both directions are dangerous:
@@ -219,6 +256,13 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../database/migrations/2026_01_01_000000_create_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_numbers_table.php'),
         ], 'whatsapp-cloud-migrations');
+
+        // Columns Embedded Signup fills (display number, business id, token
+        // expiry). Separate tag so apps that already published the table above
+        // can add just this.
+        $this->publishes([
+            __DIR__.'/../database/migrations/2026_09_26_000000_add_embedded_signup_columns_to_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His', time() + 1).'_add_embedded_signup_columns_to_whatsapp_numbers_table.php'),
+        ], 'whatsapp-cloud-embedded-signup-migrations');
 
         // A separate tag, so an app that only sends messages never acquires the
         // sandbox tables.

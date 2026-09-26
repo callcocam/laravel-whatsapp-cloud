@@ -50,6 +50,8 @@ class InstallCommand extends Command
 
         if ($hasInertia) {
             $checklist[] = 'For a NATIVE UI in your own design system (shadcn-vue), run `php artisan whatsapp:panel:scaffold` and point `panel.component` at it.';
+            $checklist[] = 'Connect numbers without copying tokens: publish `whatsapp-cloud-embedded-signup-migrations`, migrate, set WHATSAPP_CLOUD_APP_ID + WHATSAPP_CLOUD_EMBEDDED_SIGNUP_CONFIG_ID and browse /'
+                .ltrim((string) config('whatsapp-cloud.embedded_signup.prefix', 'whatsapp/cloud/numbers'), '/').' — see docs/EMBEDDED-SIGNUP.md.';
             $checklist[] = 'Lock the panel down: set WHATSAPP_CLOUD_PANEL_GATE to an authorization gate — it mutates the shared WABA.';
             $checklist[] = 'Rehearse a flow before it reaches anyone: set WHATSAPP_CLOUD_DRIVER=sandbox, publish `whatsapp-cloud-sandbox-migrations` + `whatsapp-cloud-sandbox`, migrate, and browse /'
                 .ltrim((string) config('whatsapp-cloud.sandbox.prefix', 'whatsapp/cloud/sandbox'), '/').' — see docs/SANDBOX.md.';
