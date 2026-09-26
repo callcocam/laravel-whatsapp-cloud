@@ -1,5 +1,6 @@
 <?php
 
+use Callcocam\WhatsAppCloud\Models\WhatsAppInboundMessage;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 
 return [
@@ -82,7 +83,7 @@ return [
 
     'inbound' => [
         'store' => env('WHATSAPP_CLOUD_STORE_INBOUND', true),
-        'model' => \Callcocam\WhatsAppCloud\Models\WhatsAppInboundMessage::class,
+        'model' => WhatsAppInboundMessage::class,
     ],
 
     /*
@@ -158,6 +159,72 @@ return [
     */
 
     'model' => WhatsAppNumber::class,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Connected numbers + Embedded Signup (Inertia + Vue)
+    |--------------------------------------------------------------------------
+    |
+    | A page that lists the numbers stored on `model` and connects new ones with
+    | Meta's Embedded Signup — the business logs in with Facebook, picks (or
+    | creates) its WABA and number, and the package stores the credentials. No
+    | copying ids and tokens by hand.
+    |
+    | config_id is the ID of the "WhatsApp Embedded Signup" configuration created
+    | under Facebook Login for Business → Configurations in the SAME Meta app as
+    | `app_id` / `app_secret` (the code exchange and the webhook subscription
+    | both belong to that app).
+    |
+    | register_pin, when set, registers each new number on the Cloud API with this
+    | 6-digit two-step-verification PIN. The page can also send one per signup.
+    |
+    */
+
+    'embedded_signup' => [
+        'enabled' => env('WHATSAPP_CLOUD_NUMBERS_ENABLED', true),
+        'config_id' => env('WHATSAPP_CLOUD_EMBEDDED_SIGNUP_CONFIG_ID'),
+        'register_pin' => env('WHATSAPP_CLOUD_REGISTER_PIN'),
+        'prefix' => env('WHATSAPP_CLOUD_NUMBERS_PREFIX', 'whatsapp/cloud/numbers'),
+        'name' => 'whatsapp.cloud.numbers',
+        'middleware' => ['web', 'auth'],
+        // Connecting a number grants a token over a WABA: gate it. Falls back to
+        // the template panel's gate. With no gate at all the page only opens in
+        // the local environment (403 elsewhere).
+        'gate' => env('WHATSAPP_CLOUD_NUMBERS_GATE', env('WHATSAPP_CLOUD_PANEL_GATE')),
+        'component' => env('WHATSAPP_CLOUD_NUMBERS_COMPONENT', 'WhatsAppCloud/Numbers/Index'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Setup wizard + stored settings
+    |--------------------------------------------------------------------------
+    |
+    | A page that configures everything above from the browser — app id/secret,
+    | webhook (registered at Meta by API), Embedded Signup config_id, default
+    | number — plus diagnosis and JSON export/import.
+    |
+    | What it saves goes to the `whatsapp_settings` table, encrypted with the
+    | APP_KEY, and is layered over this file on boot: a value saved in the panel
+    | wins over the .env. Set `store` to false to ignore the table entirely.
+    | Queue workers read it at boot — `queue:restart` after changing it.
+    |
+    | The wizard reads and exports SECRETS: keep it behind an admin gate. With
+    | no gate configured it only opens in the local environment (403 elsewhere).
+    |
+    */
+
+    'setup' => [
+        'enabled' => env('WHATSAPP_CLOUD_SETUP_ENABLED', true),
+        'store' => env('WHATSAPP_CLOUD_SETTINGS_STORE', true),
+        'prefix' => env('WHATSAPP_CLOUD_SETUP_PREFIX', 'whatsapp/cloud/setup'),
+        'name' => 'whatsapp.cloud.setup',
+        'middleware' => ['web', 'auth'],
+        'gate' => env('WHATSAPP_CLOUD_SETUP_GATE', env('WHATSAPP_CLOUD_PANEL_GATE')),
+        'component' => env('WHATSAPP_CLOUD_SETUP_COMPONENT', 'WhatsAppCloud/Setup/Index'),
+
+        // Written by the wizard once Meta accepted the webhook subscription.
+        'webhook_subscribed_at' => null,
+    ],
 
     /*
     |--------------------------------------------------------------------------

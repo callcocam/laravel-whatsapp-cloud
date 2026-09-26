@@ -4,7 +4,39 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Added
+- **Setup wizard** at `/whatsapp/cloud/setup`: configure the whole integration from
+  the browser. Validates the app id/secret against Meta before saving, generates the
+  verify token and registers the webhook by API, stores the Embedded Signup
+  `config_id`, connects a number (Embedded Signup or manual, checked against its
+  WABA) and makes it the default, then sends a test template and shows the reply
+  arriving through the webhook. "Validar tudo" re-checks every piece against Meta.
+  Values are saved encrypted in `whatsapp_settings` (tag
+  `whatsapp-cloud-settings-migrations`) and layered over the config on boot — a
+  value saved in the panel wins over the .env. JSON export/import carries the
+  configuration between projects. See [docs/CONFIGURACAO.md](docs/CONFIGURACAO.md).
+  The setup and connected-numbers pages need a gate (`WHATSAPP_CLOUD_SETUP_GATE` /
+  `WHATSAPP_CLOUD_NUMBERS_GATE`, falling back to `WHATSAPP_CLOUD_PANEL_GATE`); without
+  one they only open in the local environment.
+- **Connected numbers + Embedded Signup.** A page at `/whatsapp/cloud/numbers` where a
+  business connects its WhatsApp number by logging in with Facebook — no copying ids
+  and tokens by hand. The server exchanges the code, checks the number belongs to the
+  WABA, subscribes the app to the WABA's webhooks, optionally registers the number
+  with a PIN and stores it on `whatsapp-cloud.model`. Numbers can be refreshed and
+  disconnected from the same page. Fires `WhatsAppNumberConnected` so a multi-tenant
+  app can tie the row to its tenant. Config under `whatsapp-cloud.embedded_signup`
+  (`WHATSAPP_CLOUD_EMBEDDED_SIGNUP_CONFIG_ID`); new columns in the
+  `whatsapp-cloud-embedded-signup-migrations` tag. See
+  [docs/EMBEDDED-SIGNUP.md](docs/EMBEDDED-SIGNUP.md).
+
 ### Fixed
+- **Interactive list options no longer show their text twice.** `sendInteractive()`
+  sent every row's `description` — even when the label fit the 24-char title — so
+  WhatsApp printed title and description alike ("Confirmar / Confirmar") on the
+  list and on the person's reply. The description now goes only on labels longer
+  than 24 chars (the full label, still capped at 72). Row ids (`opt_N`) and
+  `InteractiveMessage` are unchanged. The sandbox's `list_reply` now echoes a
+  row's description only when the sent row had one, as Meta does.
 - **Sandbox: interactive reply buttons are tappable.** The screen only read
   `interactive.action.sections.0.rows`, so a message carrying reply BUTTONS rendered
   with no buttons at all and the rehearsal dead-ended on the very message that asked

@@ -12,9 +12,13 @@ use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
+use Callcocam\WhatsAppCloud\Http\Middleware\RequireConfiguredGate;
 use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
+use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
+use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
+use Callcocam\WhatsAppCloud\Settings\SettingsStore;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Support\NullSandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
@@ -60,6 +64,15 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         ));
 
         $this->app->alias(WhatsAppManager::class, 'whatsapp-cloud');
+
+        $this->app->singleton(SettingsStore::class, fn ($app) => new SettingsStore($app['config']));
+
+        $this->app->bind(EmbeddedSignup::class, fn ($app) => new EmbeddedSignup(
+            graphVersion: (string) $app['config']->get('whatsapp-cloud.graph_version', 'v21.0'),
+            appId: $app['config']->get('whatsapp-cloud.app_id'),
+            appSecret: $app['config']->get('whatsapp-cloud.app_secret'),
+            model: $app['config']->get('whatsapp-cloud.model', WhatsAppNumber::class),
+        ));
     }
 
     /**
@@ -92,8 +105,11 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->applyStoredSettings();
         $this->registerRoutes();
         $this->registerPanelRoutes();
+        $this->registerNumbersRoutes();
+        $this->registerSetupRoutes();
         $this->registerSandboxRoutes();
         $this->registerInboundStore();
         $this->registerPublishing();
@@ -162,6 +178,79 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
     }
 
     /**
+     * Layer the values saved from the setup wizard over the config, before
+     * anything reads it. A no-op until the settings table exists.
+     */
+    protected function applyStoredSettings(): void
+    {
+        if (! $this->app['config']->get('whatsapp-cloud.setup.store', true)) {
+            return;
+        }
+
+        // Never bake panel secrets into bootstrap/cache/config.php: they would
+        // outlive a change made in the panel, in plain text.
+        if ($this->app->runningInConsole() && in_array($_SERVER['argv'][1] ?? null, ['config:cache', 'optimize'], true)) {
+            return;
+        }
+
+        $this->app->make(SettingsStore::class)->apply();
+    }
+
+    /**
+     * Register the setup wizard. Same conditions as the other pages: enabled
+     * AND Inertia installed.
+     */
+    protected function registerSetupRoutes(): void
+    {
+        $config = $this->app['config'];
+
+        if (! $config->get('whatsapp-cloud.setup.enabled', true) || ! class_exists(Inertia::class)) {
+            return;
+        }
+
+        $middleware = (array) $config->get('whatsapp-cloud.setup.middleware', ['web', 'auth']);
+
+        // The wizard reads and exports every secret: never on `auth` alone.
+        $gate = $config->get('whatsapp-cloud.setup.gate');
+        $middleware[] = filled($gate) ? 'can:'.$gate : RequireConfiguredGate::class.':WHATSAPP_CLOUD_SETUP_GATE';
+
+        Route::group([
+            'prefix' => $config->get('whatsapp-cloud.setup.prefix', 'whatsapp/cloud/setup'),
+            'middleware' => $middleware,
+            'as' => $config->get('whatsapp-cloud.setup.name', 'whatsapp.cloud.setup').'.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__.'/../routes/setup.php');
+        });
+    }
+
+    /**
+     * Register the connected-numbers page (Embedded Signup). Same conditions as
+     * the template panel: enabled AND Inertia installed.
+     */
+    protected function registerNumbersRoutes(): void
+    {
+        $config = $this->app['config'];
+
+        if (! $config->get('whatsapp-cloud.embedded_signup.enabled', true) || ! class_exists(Inertia::class)) {
+            return;
+        }
+
+        $middleware = (array) $config->get('whatsapp-cloud.embedded_signup.middleware', ['web', 'auth']);
+
+        // Connecting a number hands out a token over a WABA: never on `auth` alone.
+        $gate = $config->get('whatsapp-cloud.embedded_signup.gate');
+        $middleware[] = filled($gate) ? 'can:'.$gate : RequireConfiguredGate::class.':WHATSAPP_CLOUD_NUMBERS_GATE';
+
+        Route::group([
+            'prefix' => $config->get('whatsapp-cloud.embedded_signup.prefix', 'whatsapp/cloud/numbers'),
+            'middleware' => $middleware,
+            'as' => $config->get('whatsapp-cloud.embedded_signup.name', 'whatsapp.cloud.numbers').'.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__.'/../routes/numbers.php');
+        });
+    }
+
+    /**
      * Register the sandbox screen.
      *
      * The guard runs both ways, because both directions are dangerous:
@@ -219,6 +308,18 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../database/migrations/2026_01_01_000000_create_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His').'_create_whatsapp_numbers_table.php'),
         ], 'whatsapp-cloud-migrations');
+
+        // Columns Embedded Signup fills (display number, business id, token
+        // expiry). Separate tag so apps that already published the table above
+        // can add just this.
+        $this->publishes([
+            __DIR__.'/../database/migrations/2026_09_26_000000_add_embedded_signup_columns_to_whatsapp_numbers_table.php' => database_path('migrations/'.date('Y_m_d_His', time() + 1).'_add_embedded_signup_columns_to_whatsapp_numbers_table.php'),
+        ], 'whatsapp-cloud-embedded-signup-migrations');
+
+        // Settings saved from the setup wizard (encrypted).
+        $this->publishes([
+            __DIR__.'/../database/migrations/2026_09_27_000000_create_whatsapp_settings_table.php' => database_path('migrations/'.date('Y_m_d_His', time() + 2).'_create_whatsapp_settings_table.php'),
+        ], 'whatsapp-cloud-settings-migrations');
 
         // A separate tag, so an app that only sends messages never acquires the
         // sandbox tables.

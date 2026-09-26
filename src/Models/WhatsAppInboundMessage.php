@@ -2,11 +2,13 @@
 
 namespace Callcocam\WhatsAppCloud\Models;
 
+use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * A stored inbound WhatsApp message (`whatsapp_inbound_messages`). Filled by
- * {@see \Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage} when
+ * {@see StoreInboundMessage} when
  * `whatsapp-cloud.inbound.store` is on, giving any host app a durable log of
  * everything that arrived — and a place to record what it did with each one.
  *
@@ -21,10 +23,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property array<string, mixed>|null $payload
  * @property string $status
  * @property string|null $forwarded_to
- * @property \Illuminate\Support\Carbon|null $forwarded_at
- * @property \Illuminate\Support\Carbon|null $handled_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $forwarded_at
+ * @property Carbon|null $handled_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class WhatsAppInboundMessage extends Model
 {

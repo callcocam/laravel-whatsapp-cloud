@@ -4,6 +4,7 @@ namespace Callcocam\WhatsAppCloud\Http\Controllers;
 
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppException;
+use Callcocam\WhatsAppCloud\Http\Controllers\Concerns\GuardsPanelUiToken;
 use Callcocam\WhatsAppCloud\Templates\TemplateInput;
 use Callcocam\WhatsAppCloud\Templates\TemplateManager;
 use Callcocam\WhatsAppCloud\WhatsAppManager;
@@ -27,6 +28,8 @@ use LogicException;
  */
 class TemplatePanelController
 {
+    use GuardsPanelUiToken;
+
     /**
      * The panel page: the current WABA templates plus the public credentials.
      */
@@ -263,26 +266,5 @@ class TemplatePanelController
     private function routeName(): string
     {
         return (string) config('whatsapp-cloud.panel.name', 'whatsapp.cloud.panel').'.index';
-    }
-
-    /**
-     * Optional defense-in-depth: when `panel.ui_token` is set every request must
-     * carry the same value in the X-WA-UI-Token header.
-     */
-    private function guardUiToken(Request $request): void
-    {
-        $expected = config('whatsapp-cloud.panel.ui_token');
-
-        if (blank($expected)) {
-            return;
-        }
-
-        $provided = (string) $request->header('X-WA-UI-Token', '');
-
-        abort_unless(
-            $provided !== '' && hash_equals((string) $expected, $provided),
-            401,
-            'Não autorizado — informe o WA_UI_TOKEN.',
-        );
     }
 }

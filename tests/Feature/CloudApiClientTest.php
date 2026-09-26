@@ -100,6 +100,39 @@ it('sends an interactive list capping row titles at 24 chars', function () {
     });
 });
 
+it('sends a row description only when the label does not fit the title', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.I']]])]);
+
+    $short = 'Registrar donativos'; // 19 chars: fits the title
+    $medium = 'Registrar donativos da semana'; // 29 chars: 25..72
+    $long = str_repeat('Doação recebida no culto de domingo ', 3); // > 72 chars
+
+    makeClient()->sendInteractive('5548222222222', InteractiveMessage::multiChoice('O que deseja fazer?', [
+        $short, 'Confirmar', $medium, $long, str_repeat('x', 24), str_repeat('y', 25),
+    ]));
+
+    Http::assertSent(function (Request $request) use ($short, $medium, $long) {
+        $rows = $request->data()['interactive']['action']['sections'][0]['rows'];
+
+        // Short labels: title only — a description equal to the title is what
+        // WhatsApp printed twice ("Confirmar / Confirmar").
+        expect($rows[0])->toBe(['id' => 'opt_0', 'title' => $short])
+            ->and($rows[1])->toBe(['id' => 'opt_1', 'title' => 'Confirmar'])
+            // 25..72: title cut at 24, full label in the description.
+            ->and($rows[2])->toBe(['id' => 'opt_2', 'title' => mb_substr($medium, 0, 24), 'description' => $medium])
+            // > 72: description cut at 72.
+            ->and($rows[3]['title'])->toBe(mb_substr($long, 0, 24))
+            ->and($rows[3]['description'])->toBe(mb_substr($long, 0, 72))
+            ->and(mb_strlen($rows[3]['description']))->toBe(72)
+            // The boundary: exactly 24 fits, 25 does not.
+            ->and($rows[4])->not->toHaveKey('description')
+            ->and($rows[5]['description'])->toBe(str_repeat('y', 25))
+            ->and(array_column($rows, 'id'))->toBe(['opt_0', 'opt_1', 'opt_2', 'opt_3', 'opt_4', 'opt_5']);
+
+        return true;
+    });
+});
+
 it('throws a terminal CloudApiException on a closed session window (131047)', function () {
     Http::fake([
         'graph.facebook.com/*' => Http::response([

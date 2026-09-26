@@ -6,6 +6,7 @@ use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
 use Callcocam\WhatsAppCloud\Support\HasWhatsAppCredentials;
 use Callcocam\WhatsAppCloud\Support\ModelCredentialsResolver;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * The package's default, opt-in credentials model (`whatsapp_numbers` table).
@@ -15,8 +16,12 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property string|null $key
  * @property string|null $waba_id
+ * @property string|null $business_id
  * @property string|null $phone_number_id
+ * @property string|null $display_phone_number
  * @property string|null $cloud_access_token
+ * @property Carbon|null $token_expires_at
+ * @property Carbon|null $connected_at
  * @property string|null $app_id
  * @property string|null $verified_name
  * @property string|null $quality_rating
@@ -46,6 +51,8 @@ class WhatsAppNumber extends Model implements WhatsAppCredentials
     {
         return [
             'cloud_access_token' => 'encrypted',
+            'token_expires_at' => 'datetime',
+            'connected_at' => 'datetime',
         ];
     }
 }

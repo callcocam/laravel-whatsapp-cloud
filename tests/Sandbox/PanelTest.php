@@ -3,6 +3,7 @@
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Facades\WhatsApp;
+use Callcocam\WhatsAppCloud\Messages\InteractiveMessage;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxConversation;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxMessage;
@@ -267,4 +268,40 @@ it('makes every row tappable, not just the first section', function () {
         ['id' => '1', 'title' => 'Alimentação', 'kind' => 'list'],
         ['id' => '2', 'title' => 'Salário', 'kind' => 'list'],
     ]);
+});
+
+it('echoes a row description in list_reply only when the row had one, like Meta', function () {
+    $seen = [];
+    Event::listen(WhatsAppMessageReceived::class, function ($event) use (&$seen) {
+        $seen[] = $event->message;
+    });
+
+    $maria = app(Sandbox::class)->participant('5548999999999', 'Maria');
+    app(Sandbox::class)->reply($maria, 'oi');
+
+    WhatsApp::for()->sendInteractive('5548999999999', InteractiveMessage::multiChoice('O que deseja fazer?', [
+        'Confirmar',
+        'Registrar donativos da semana',
+    ]));
+
+    $message = SandboxMessage::where('direction', SandboxMessage::OUTBOUND)->sole();
+
+    foreach ([['opt_0', 'Confirmar'], ['opt_1', 'Registrar donativos da s']] as [$id, $title]) {
+        $this->post('whatsapp/cloud/sandbox/tap', [
+            'conversation' => $message->conversation_id,
+            'kind' => 'list',
+            'id' => $id,
+            'text' => $title,
+            'reply_to' => $message->wamid,
+        ])->assertRedirect();
+    }
+
+    $replies = array_column(array_column(array_slice($seen, -2), 'interactive'), 'list_reply');
+
+    expect($replies[0])->toBe(['id' => 'opt_0', 'title' => 'Confirmar'])
+        ->and($replies[1])->toBe([
+            'id' => 'opt_1',
+            'title' => 'Registrar donativos da s',
+            'description' => 'Registrar donativos da semana',
+        ]);
 });

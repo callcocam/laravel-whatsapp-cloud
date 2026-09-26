@@ -75,18 +75,28 @@ class CloudApiClient implements MessageGateway
 
     /**
      * A question with options, as a Meta interactive list. Row titles are capped
-     * at Meta's 24-char limit with the full label kept in the description.
+     * at Meta's 24-char limit; only a label that does NOT fit gets a description
+     * (the full label, capped at 72). WhatsApp shows title AND description — on
+     * the list and on the person's reply bubble — so a description equal to the
+     * title prints the option twice ("Confirmar / Confirmar").
+     *
+     * Row ids are `opt_{index}` and apps map the reply by them: keep them stable.
      */
     public function sendInteractive(string $to, InteractiveMessage $message): SendResult
     {
         $rows = [];
 
         foreach ($message->options as $index => $label) {
-            $rows[] = [
+            $row = [
                 'id' => 'opt_'.$index,
                 'title' => mb_substr($label, 0, 24),
-                'description' => mb_substr($label, 0, 72),
             ];
+
+            if (mb_strlen($label) > 24) {
+                $row['description'] = mb_substr($label, 0, 72);
+            }
+
+            $rows[] = $row;
         }
 
         return $this->send($to, [
