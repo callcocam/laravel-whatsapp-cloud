@@ -64,6 +64,15 @@ class CloudApiClient implements MessageGateway
             $components[] = ['type' => 'body', 'parameters' => $parameters];
         }
 
+        foreach ($template->buttonPayloads as $index => $buttonPayload) {
+            $components[] = [
+                'type' => 'button',
+                'sub_type' => 'quick_reply',
+                'index' => (string) $index,
+                'parameters' => [['type' => 'payload', 'payload' => mb_substr($buttonPayload, 0, 1000)]],
+            ];
+        }
+
         if ($components !== []) {
             $payload['components'] = $components;
         }

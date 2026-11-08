@@ -63,7 +63,7 @@ class Sandbox
     {
         return $this->deliver(
             $conversation,
-            $this->factory($conversation)->templateButton($text, $replyTo),
+            $this->factory($conversation)->templateButton($text, $replyTo, $this->buttonPayload($conversation, $replyTo, $text)),
             type: 'button',
             rendered: $text,
         );
@@ -104,6 +104,36 @@ class Sandbox
             type: 'interactive',
             rendered: $title,
         );
+    }
+
+    /**
+     * The payload the SEND gave to the tapped quick-reply button: the button's
+     * position among the template's quick replies, matched to the `button`
+     * component of that index. Null when the send set none (Meta echoes the text).
+     */
+    protected function buttonPayload(SandboxConversation $conversation, string $replyTo, string $text): ?string
+    {
+        $message = $conversation->messages()->where('wamid', $replyTo)->first();
+
+        $quickReplies = array_values(array_filter(
+            (array) data_get(collect((array) $message?->template_components)->firstWhere('type', 'BUTTONS'), 'buttons', []),
+            static fn ($button): bool => data_get($button, 'type') === 'QUICK_REPLY',
+        ));
+        $index = array_search($text, array_map(static fn ($button): string => (string) data_get($button, 'text'), $quickReplies), true);
+
+        if ($index === false) {
+            return null;
+        }
+
+        foreach ((array) data_get($message?->envelope, 'template.components', []) as $component) {
+            if (data_get($component, 'type') === 'button' && (string) data_get($component, 'index') === (string) $index) {
+                $payload = data_get($component, 'parameters.0.payload');
+
+                return is_string($payload) ? $payload : null;
+            }
+        }
+
+        return null;
     }
 
     /**

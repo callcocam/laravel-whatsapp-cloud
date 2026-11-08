@@ -4,7 +4,13 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-11-08
+## [0.4.0] - 2026-11-08
+
+### Added
+- **Quick-reply payloads on templates.** `TemplateMessage::withButtonPayloads([index => payload])`
+  sends the payload each QUICK_REPLY button returns (`button.payload` on the webhook),
+  so a tap says which record it is about. The sandbox echoes the payload the send
+  chose (and the text when there is none, as Meta does).
 
 ### Changed
 - **Reply buttons.** `sendInteractive()` sends up to 3 options that all fit a button
