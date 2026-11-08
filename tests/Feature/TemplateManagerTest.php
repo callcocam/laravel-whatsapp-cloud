@@ -1,6 +1,7 @@
 <?php
 
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
+use Callcocam\WhatsAppCloud\Templates\TemplateBuilder;
 use Callcocam\WhatsAppCloud\WhatsAppManager;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -97,4 +98,42 @@ it('runs the whatsapp:template:list command', function () {
     $this->artisan('whatsapp:template:list')
         ->assertExitCode(0)
         ->expectsOutputToContain('coordena_x');
+});
+
+it('uploads the example of a document header and submits its handle', function () {
+    config(['whatsapp-cloud.app_id' => '5550001']);
+    $file = tempnam(sys_get_temp_dir(), 'ex').'.pdf';
+    file_put_contents($file, '%PDF-1.4 example');
+
+    Http::fake([
+        'graph.facebook.com/v21.0/5550001/uploads*' => Http::response(['id' => 'upload:SESSION']),
+        'graph.facebook.com/v21.0/upload:SESSION' => Http::response(['h' => '4::HANDLE']),
+        'graph.facebook.com/v21.0/999888777/message_templates' => Http::response(['id' => 'tpl_2', 'status' => 'PENDING']),
+    ]);
+
+    $payload = TemplateBuilder::make('coordena_doc', 'pt_BR', 'UTILITY')
+        ->headerDocument($file)
+        ->body('Olá, {{1}}! Segue o recibo.', ['Ana'])
+        ->toArray();
+
+    app(WhatsAppManager::class)->templateApi()->create($payload);
+
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), '/5550001/uploads?') && str_contains($r->url(), 'file_type=application%2Fpdf'));
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/upload:SESSION') && $r->hasHeader('Authorization', 'OAuth default-token') && $r->body() === '%PDF-1.4 example');
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'message_templates')
+        && $r->data()['components'][0] === ['type' => 'HEADER', 'format' => 'DOCUMENT', 'example' => ['header_handle' => ['4::HANDLE']]]);
+
+    @unlink($file);
+});
+
+it('refuses a document header example without the app id', function () {
+    config(['whatsapp-cloud.app_id' => null]);
+    Http::fake();
+
+    expect(fn () => app(WhatsAppManager::class)->templateApi()->create([
+        'name' => 'x', 'language' => 'pt_BR', 'category' => 'UTILITY',
+        'components' => [['type' => 'HEADER', 'format' => 'DOCUMENT', 'example' => ['header_handle_file' => '/tmp/x.pdf']]],
+    ]))->toThrow(CloudApiException::class);
+
+    Http::assertNothingSent();
 });

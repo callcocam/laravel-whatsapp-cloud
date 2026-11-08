@@ -82,6 +82,7 @@ class WhatsAppManager
             wabaId: (string) $wabaId,
             accessToken: $credentials->accessToken(),
             phoneNumberId: $credentials->phoneNumberId(),
+            appId: filled(config('whatsapp-cloud.app_id')) ? (string) config('whatsapp-cloud.app_id') : null,
         );
     }
 

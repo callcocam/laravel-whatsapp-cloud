@@ -116,6 +116,23 @@ final class TemplateBuilder
         return $this;
     }
 
+    /**
+     * Document header (a PDF sent with each message). Meta reviews the template
+     * with an example file: pass a local path, and {@see TemplateManager::create()}
+     * uploads it (Resumable Upload API, needs `whatsapp-cloud.app_id`) and swaps
+     * it for the `header_handle` Meta expects.
+     */
+    public function headerDocument(string $exampleFile): self
+    {
+        $this->components[] = [
+            'type' => 'HEADER',
+            'format' => 'DOCUMENT',
+            'example' => [TemplateManager::EXAMPLE_FILE => $exampleFile],
+        ];
+
+        return $this;
+    }
+
     /** Footer (optional, no variables — Meta rule). */
     public function footer(string $text): self
     {

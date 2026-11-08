@@ -2,6 +2,7 @@
 
 namespace Callcocam\WhatsAppCloud;
 
+use Callcocam\WhatsAppCloud\Contracts\MediaUploader;
 use Callcocam\WhatsAppCloud\Contracts\MessageGateway;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
@@ -53,11 +54,31 @@ class CloudApiClient implements MessageGateway
             'language' => ['code' => $meta->language],
         ];
 
+        $components = [];
+
+        if ($template->document !== null) {
+            $components[] = ['type' => 'header', 'parameters' => [['type' => 'document', 'document' => $template->document]]];
+        }
+
         if ($parameters !== []) {
-            $payload['components'] = [['type' => 'body', 'parameters' => $parameters]];
+            $components[] = ['type' => 'body', 'parameters' => $parameters];
+        }
+
+        if ($components !== []) {
+            $payload['components'] = $components;
         }
 
         return $this->send($to, ['type' => 'template', 'template' => $payload]);
+    }
+
+    /**
+     * Upload a file to Meta and get the media id a template header refers to
+     * ({@see TemplateMessage::withDocument()}). Under the sandbox driver nothing
+     * leaves the machine.
+     */
+    public function uploadMedia(string $contents, string $mimeType, string $filename): string
+    {
+        return app(MediaUploader::class)->upload($this->credentials(), $contents, $mimeType, $filename);
     }
 
     /**
