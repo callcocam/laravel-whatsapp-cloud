@@ -216,3 +216,19 @@ it('creates the conversation from the first outbound message', function () {
 
     expect(SandboxConversation::sole()->wa_id)->toBe('5548777777777');
 });
+
+it('keeps an uploaded document on the machine and shows it on the template', function () {
+    WhatsApp::registerTemplate('receipt', new MetaTemplate('coordena_receipt', 'pt_BR', 'utility', ['name']));
+
+    $client = WhatsApp::for();
+    $mediaId = $client->uploadMedia('%PDF-1.4', 'application/pdf', 'recibo.pdf');
+
+    expect($mediaId)->toStartWith('sandbox-media-');
+
+    $client->sendTemplate('5548999999999', TemplateMessage::make('receipt', ['name' => 'Maria'])->withDocument($mediaId, 'recibo.pdf'));
+
+    $message = SandboxMessage::sole();
+
+    expect($message->rendered_text)->toStartWith('📎 recibo.pdf')
+        ->and($message->meta)->not->toHaveKey('param_count_mismatch');
+});

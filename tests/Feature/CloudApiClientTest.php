@@ -174,3 +174,42 @@ it('resolving an unregistered template key throws', function () {
     expect(fn () => (new TemplateRegistry)->resolve('nope'))
         ->toThrow(CloudApiException::class);
 });
+
+it('sends a template with a document in its header before the body params', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.DOC']]])]);
+
+    makeClient()->sendTemplate('5548999999999', TemplateMessage::make('assignment', [
+        'name' => 'Maria', 'event' => 'Congresso', 'url' => 'https://coordena.app/x',
+    ])->withDocument('media-123', 'recibo.pdf'));
+
+    Http::assertSent(function (Request $request) {
+        $components = $request->data()['template']['components'];
+
+        expect($components[0])->toBe([
+            'type' => 'header',
+            'parameters' => [['type' => 'document', 'document' => ['id' => 'media-123', 'filename' => 'recibo.pdf']]],
+        ])->and($components[1]['type'])->toBe('body')
+            ->and($components[1]['parameters'][0]['text'])->toBe('Maria');
+
+        return true;
+    });
+});
+
+it('uploads a file to the number media endpoint and returns its id', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['id' => 'media-987'])]);
+
+    $id = makeClient()->uploadMedia('%PDF-1.4 fake', 'application/pdf', 'recibo.pdf');
+
+    expect($id)->toBe('media-987');
+
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://graph.facebook.com/v21.0/111222333/media'
+        && $request->hasHeader('Authorization', 'Bearer the-token')
+        && $request->isMultipart());
+});
+
+it('fails the upload with Meta error code', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['error' => ['message' => 'Bad file', 'code' => 131053]], 400)]);
+
+    expect(fn () => makeClient()->uploadMedia('x', 'application/pdf', 'r.pdf'))
+        ->toThrow(CloudApiException::class);
+});

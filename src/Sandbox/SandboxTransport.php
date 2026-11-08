@@ -134,12 +134,26 @@ class SandboxTransport implements MessageTransport
         return match ($type) {
             'text' => (string) data_get($envelope, 'text.body'),
             'interactive' => (string) data_get($envelope, 'interactive.body.text'),
-            'template' => $template?->render($this->params($envelope))
+            'template' => $this->attachment($envelope).($template?->render($this->params($envelope))
                 // No definition file and Meta could not be reached: show what we
                 // do know rather than an empty bubble.
-                ?? trim((string) data_get($envelope, 'template.name').' '.implode(' · ', $this->params($envelope))),
+                ?? trim((string) data_get($envelope, 'template.name').' '.implode(' · ', $this->params($envelope)))),
             default => null,
         };
+    }
+
+    /**
+     * "📎 recibo.pdf" above the text when the template header carries a document.
+     *
+     * @param  array<string, mixed>  $envelope
+     */
+    private function attachment(array $envelope): string
+    {
+        $header = collect((array) data_get($envelope, 'template.components', []))
+            ->first(fn ($component): bool => data_get($component, 'type') === 'header');
+        $filename = data_get($header, 'parameters.0.document.filename');
+
+        return is_string($filename) && $filename !== '' ? "📎 {$filename}\n" : '';
     }
 
     /**
@@ -150,7 +164,9 @@ class SandboxTransport implements MessageTransport
      */
     private function params(array $envelope): array
     {
-        $parameters = (array) data_get($envelope, 'template.components.0.parameters', []);
+        $body = collect((array) data_get($envelope, 'template.components', []))
+            ->first(fn ($component): bool => data_get($component, 'type') === 'body');
+        $parameters = (array) data_get($body, 'parameters', []);
 
         return array_values(array_map(
             static fn ($parameter): string => (string) data_get($parameter, 'text', ''),

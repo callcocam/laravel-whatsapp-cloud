@@ -25,4 +25,9 @@ interface MessageGateway
     public function sendSessionText(string $to, string $text): SendResult;
 
     public function sendInteractive(string $to, InteractiveMessage $message): SendResult;
+
+    /**
+     * Upload a file for a template header; returns the media id.
+     */
+    public function uploadMedia(string $contents, string $mimeType, string $filename): string;
 }

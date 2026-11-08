@@ -4,6 +4,25 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-08
+
+### Added
+- **Document header on templates.** `TemplateMessage::withDocument($mediaId, $filename)`
+  sends a PDF in the template's DOCUMENT header, before the body params.
+- **Media upload.** `CloudApiClient::uploadMedia($contents, $mime, $filename)` (also on
+  `MessageGateway`) posts the file to the number's `/media` endpoint and returns the
+  media id — no public URL needed. New `MediaUploader` contract, chosen by the same
+  `whatsapp-cloud.driver`: `CloudApiMediaUploader` for real, `SandboxMediaUploader`
+  (refuses production) keeps the file on the machine.
+- **`TemplateBuilder::headerDocument($exampleFile)`.** `TemplateManager::create()` uploads
+  the example through the Resumable Upload API (needs `whatsapp-cloud.app_id`) and
+  submits Meta's `header_handle`; `TemplateManager::uploadExample()` is public.
+
+### Changed
+- The sandbox reads the body params from the `body` component (not the first one) and
+  shows `📎 <file>` above a template that carries a document.
+- `MessageGateway` gained `uploadMedia()`: a custom implementation must add it.
+
 ## [0.2.0] - 2026-09-26
 
 ### Added

@@ -8,6 +8,7 @@ use Callcocam\WhatsAppCloud\Console\InstallCommand;
 use Callcocam\WhatsAppCloud\Console\ListTemplates;
 use Callcocam\WhatsAppCloud\Console\ScaffoldPanel;
 use Callcocam\WhatsAppCloud\Console\SendTemplate;
+use Callcocam\WhatsAppCloud\Contracts\MediaUploader;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
@@ -16,12 +17,14 @@ use Callcocam\WhatsAppCloud\Http\Middleware\RequireConfiguredGate;
 use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
+use Callcocam\WhatsAppCloud\Sandbox\SandboxMediaUploader;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxTransport;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
 use Callcocam\WhatsAppCloud\Settings\SettingsStore;
 use Callcocam\WhatsAppCloud\Support\ConfigCredentialsResolver;
 use Callcocam\WhatsAppCloud\Support\NullSandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
+use Callcocam\WhatsAppCloud\Transport\CloudApiMediaUploader;
 use Callcocam\WhatsAppCloud\Transport\CloudApiTransport;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -89,6 +92,18 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->app->bind(TemplateDefinitions::class, fn ($app) => new TemplateDefinitions(
             $app['config']->get('whatsapp-cloud.definitions_path'),
         ));
+
+        $this->app->bind(MediaUploader::class, function ($app) {
+            $driver = (string) $app['config']->get('whatsapp-cloud.driver', 'cloud');
+
+            return match ($driver) {
+                'cloud' => new CloudApiMediaUploader,
+                'sandbox' => $app->make(SandboxMediaUploader::class),
+                default => throw new InvalidArgumentException(
+                    "Unknown whatsapp-cloud driver [{$driver}]. Expected 'cloud' or 'sandbox'.",
+                ),
+            };
+        });
 
         $this->app->bind(MessageTransport::class, function ($app) {
             $driver = (string) $app['config']->get('whatsapp-cloud.driver', 'cloud');

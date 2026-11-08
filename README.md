@@ -94,6 +94,27 @@ WhatsApp::for($team)->sendInteractive('5548999999999',
 single-tenant). Prefira injetar `WhatsAppManager` a usar a Facade em código
 testável.
 
+### Enviar um documento (PDF) no cabeçalho do template
+
+O arquivo sobe para a Meta pelo endpoint `/media` e volta um id (válido por 30
+dias, sem link público); o template precisa ter cabeçalho `DOCUMENT`:
+
+```php
+$client = WhatsApp::for($team);
+$mediaId = $client->uploadMedia($pdfBytes, 'application/pdf', 'recibo.pdf');
+
+$client->sendTemplate('5548999999999', TemplateMessage::make('receipt_signed', [
+    'name' => 'Maria', 'document' => 'Recibo de 04/11', 'url' => 'https://app.test/r/1',
+])->withDocument($mediaId, 'recibo.pdf'));
+```
+
+Com o driver `sandbox` nada sai da máquina (o id começa com `sandbox-media-` e o
+inspector mostra `📎 recibo.pdf` acima do texto).
+
+Na definição do template, `->headerDocument('/caminho/exemplo.pdf')`: o
+`whatsapp:template:create` sobe o exemplo pela Resumable Upload API (precisa de
+`WHATSAPP_CLOUD_APP_ID`) e envia o `header_handle` que a Meta exige para revisar.
+
 ### Tratar erros da Meta
 
 ```php
