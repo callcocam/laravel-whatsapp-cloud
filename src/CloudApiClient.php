@@ -95,16 +95,43 @@ class CloudApiClient implements MessageGateway
     }
 
     /**
-     * A question with options, as a Meta interactive list. Row titles are capped
-     * at Meta's 24-char limit; only a label that does NOT fit gets a description
-     * (the full label, capped at 72). WhatsApp shows title AND description — on
-     * the list and on the person's reply bubble — so a description equal to the
-     * title prints the option twice ("Confirmar / Confirmar").
+     * Meta's reply-button limits: at most 3 buttons, each title at most 20 chars.
+     */
+    public const MAX_REPLY_BUTTONS = 3;
+
+    public const MAX_BUTTON_TITLE = 20;
+
+    /**
+     * A question with options. Up to 3 options that all fit a button title go as
+     * Meta **reply buttons** (tapped right on the message); anything else goes as
+     * an interactive **list**. Row titles are capped at Meta's 24-char limit;
+     * only a label that does NOT fit gets a description (the full label, capped
+     * at 72). WhatsApp shows title AND description — on the list and on the
+     * person's reply bubble — so a description equal to the title prints the
+     * option twice ("Confirmar / Confirmar").
      *
-     * Row ids are `opt_{index}` and apps map the reply by them: keep them stable.
+     * Option ids are `opt_{index}` for both shapes and apps map the reply by them
+     * (`button_reply.id` or `list_reply.id`): keep them stable.
      */
     public function sendInteractive(string $to, InteractiveMessage $message): SendResult
     {
+        if ($this->fitsReplyButtons($message->options)) {
+            return $this->send($to, [
+                'type' => 'interactive',
+                'interactive' => [
+                    'type' => 'button',
+                    'body' => ['text' => $message->body],
+                    'action' => [
+                        'buttons' => array_map(
+                            fn (string $label, int $index): array => ['type' => 'reply', 'reply' => ['id' => 'opt_'.$index, 'title' => $label]],
+                            $message->options,
+                            array_keys($message->options),
+                        ),
+                    ],
+                ],
+            ]);
+        }
+
         $rows = [];
 
         foreach ($message->options as $index => $label) {
@@ -131,6 +158,25 @@ class CloudApiClient implements MessageGateway
                 ],
             ],
         ]);
+    }
+
+    /**
+     * @param  list<string>  $options
+     */
+    private function fitsReplyButtons(array $options): bool
+    {
+        if ($options === [] || count($options) > self::MAX_REPLY_BUTTONS) {
+            return false;
+        }
+
+        foreach ($options as $label) {
+            if ($label === '' || mb_strlen($label) > self::MAX_BUTTON_TITLE) {
+                return false;
+            }
+        }
+
+        // Meta refuses two buttons with the same title.
+        return count(array_unique($options)) === count($options);
     }
 
     /**
