@@ -3,6 +3,7 @@
 namespace Callcocam\WhatsAppCloud\Sandbox;
 
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
+use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
 use Illuminate\Support\Str;
 
 /**
@@ -61,19 +62,17 @@ final class InboundPayloadFactory
     /**
      * A tap on a TEMPLATE quick-reply button.
      *
-     * Note `payload` === `text`. Meta only lets you choose the payload when the
-     * SEND specified `components[{type: button, sub_type: quick_reply,
-     * parameters: [{type: payload}]}]` — which this package never does. Making
-     * the sandbox return a distinct payload would let an app be written against
-     * a message production never sends.
+     * `payload` is the one the SEND chose for that button
+     * ({@see TemplateMessage::withButtonPayloads()}); without one, Meta echoes the
+     * button text, and so does the sandbox.
      *
      * @return array<string, mixed>
      */
-    public function templateButton(string $text, ?string $replyTo = null): array
+    public function templateButton(string $text, ?string $replyTo = null, ?string $payload = null): array
     {
         return $this->message([
             'type' => 'button',
-            'button' => ['payload' => $text, 'text' => $text],
+            'button' => ['payload' => $payload ?? $text, 'text' => $text],
         ], $replyTo);
     }
 

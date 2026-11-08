@@ -232,3 +232,53 @@ it('keeps an uploaded document on the machine and shows it on the template', fun
     expect($message->rendered_text)->toStartWith('📎 recibo.pdf')
         ->and($message->meta)->not->toHaveKey('param_count_mismatch');
 });
+
+it('echoes the payload the send chose when a template quick reply is tapped', function () {
+    $dir = sys_get_temp_dir().'/wa-defs-'.uniqid();
+    mkdir($dir);
+    file_put_contents($dir.'/coordena_check.php', <<<'PHP'
+        <?php
+        return [
+            'name' => 'coordena_check',
+            'language' => 'pt_BR',
+            'category' => 'UTILITY',
+            'components' => [
+                ['type' => 'BODY', 'text' => 'Olá, {{1}}! Confere?'],
+                ['type' => 'BUTTONS', 'buttons' => [
+                    ['type' => 'QUICK_REPLY', 'text' => 'Conferido'],
+                    ['type' => 'QUICK_REPLY', 'text' => 'Tem problema'],
+                ]],
+            ],
+        ];
+        PHP);
+    config()->set('whatsapp-cloud.definitions_path', $dir);
+
+    WhatsApp::registerTemplate('check', new MetaTemplate('coordena_check', 'pt_BR', 'utility', ['name']));
+
+    $heard = [];
+    Event::listen(WhatsAppMessageReceived::class, function ($event) use (&$heard) {
+        $heard[] = $event->message['button'] ?? null;
+    });
+
+    $result = WhatsApp::for()->sendTemplate('5548999999999', TemplateMessage::make('check', ['name' => 'Maria'])
+        ->withButtonPayloads([0 => 'receipt_ok:01ABC', 1 => 'receipt_problem:01ABC']));
+
+    $components = SandboxMessage::sole()->envelope['template']['components'];
+
+    expect($components[1])->toBe([
+        'type' => 'button', 'sub_type' => 'quick_reply', 'index' => '0',
+        'parameters' => [['type' => 'payload', 'payload' => 'receipt_ok:01ABC']],
+    ]);
+
+    $sandbox = app(Sandbox::class);
+    $maria = SandboxConversation::sole();
+    $sandbox->tapTemplateButton($maria, 'Tem problema', $result->messageId);
+    $sandbox->tapTemplateButton($maria, 'Inexistente', $result->messageId);
+
+    expect($heard[0])->toBe(['payload' => 'receipt_problem:01ABC', 'text' => 'Tem problema'])
+        // A button the send gave no payload: Meta echoes the text.
+        ->and($heard[1])->toBe(['payload' => 'Inexistente', 'text' => 'Inexistente']);
+
+    unlink($dir.'/coordena_check.php');
+    rmdir($dir);
+});

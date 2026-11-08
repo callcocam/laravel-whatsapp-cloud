@@ -133,6 +133,45 @@ it('sends a row description only when the label does not fit the title', functio
     });
 });
 
+it('sends up to 3 short options as reply buttons with the same opt ids', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.B']]])]);
+
+    makeClient()->sendInteractive('5548222222222', InteractiveMessage::multiChoice('Confirma?', ['Sim', 'Não']));
+
+    Http::assertSent(function (Request $request) {
+        $interactive = $request->data()['interactive'];
+
+        expect($interactive['type'])->toBe('button')
+            ->and($interactive['body'])->toBe(['text' => 'Confirma?'])
+            ->and($interactive['action']['buttons'])->toBe([
+                ['type' => 'reply', 'reply' => ['id' => 'opt_0', 'title' => 'Sim']],
+                ['type' => 'reply', 'reply' => ['id' => 'opt_1', 'title' => 'Não']],
+            ]);
+
+        return true;
+    });
+});
+
+it('falls back to a list for more than 3 options, a label over 20 chars or repeated labels', function (array $options) {
+    Http::fake(['graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.L']]])]);
+
+    makeClient()->sendInteractive('5548222222222', InteractiveMessage::multiChoice('Escolha', $options));
+
+    Http::assertSent(fn (Request $request) => $request->data()['interactive']['type'] === 'list');
+})->with([
+    'four options' => [['A', 'B', 'C', 'D']],
+    'a long label' => [['Sim', str_repeat('x', 21)]],
+    'repeated' => [['Sim', 'Sim']],
+]);
+
+it('takes a label of exactly 20 chars as a button', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.E']]])]);
+
+    makeClient()->sendInteractive('5548222222222', InteractiveMessage::multiChoice('Escolha', [str_repeat('x', 20), 'Outro']));
+
+    Http::assertSent(fn (Request $request) => $request->data()['interactive']['type'] === 'button');
+});
+
 it('throws a terminal CloudApiException on a closed session window (131047)', function () {
     Http::fake([
         'graph.facebook.com/*' => Http::response([
