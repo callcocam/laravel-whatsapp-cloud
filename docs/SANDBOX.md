@@ -169,8 +169,9 @@ Seja honesto sobre os buracos, senão eles viram surpresa em produção:
   **não roda** aqui.
 - **A aprovação de template pela Meta.** O sandbox mostra o template como ele *será*; se a Meta vai aprovar o
   texto é outra conversa (as guard-rails do `TemplateBuilder` cobrem os motivos mais comuns de rejeição).
-- **Mídia.** Uma imagem inbound vem com um `media.SANDBOX.<id>` que não existe. Um app que baixa mídia
-  cegamente vai perceber aqui — de propósito.
+- **Mídia de verdade.** Imagem e documento inbound vêm com um `media.SANDBOX.<id>`; o `downloadMedia()`
+  devolve o arquivo que o teste guardou com `SandboxMediaDownloader::put()` ou um JPEG/PDF de exemplo, nunca
+  a foto real de alguém. A URL temporária da Meta e a expiração dela não são exercitadas.
 - **Multi-tenant.** O sandbox opera no tenant `default`.
 
 ### Por que o simulador invoca o controller direto

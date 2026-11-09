@@ -4,6 +4,21 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Added
+- **Media download.** `CloudApiClient::downloadMedia($mediaId, $maxBytes = null, $allowedMimeTypes = [])`
+  fetches a file someone sent (`GET /{media-id}` → temporary URL → bytes, both with the
+  token) and returns `DownloadedMedia` (contents, Meta's mime type, size and the sha256 of
+  what arrived). Size and type are checked before downloading; the size again after.
+  Refusals throw `MediaDownloadException` (`too_large` / `type_not_allowed`, terminal).
+  Default limit: `whatsapp-cloud.media.max_download_bytes` (16 MB). New `MediaDownloader`
+  contract on the same `whatsapp-cloud.driver`: `CloudApiMediaDownloader` for real,
+  `SandboxMediaDownloader` (refuses production) answers what a test put under the id
+  (`SandboxMediaDownloader::put()`) or a bundled sample JPEG/PDF.
+- **`InboundMedia::fromMessage($message)`** reads the `image`/`document` part of an
+  inbound message (id, mime type, sha256, filename, caption); anything else is `null`.
+- **`InboundPayloadFactory::document()`**, and a `$mediaId` on `image()`, so a test can
+  pick the file the download answers.
+
 ## [0.4.0] - 2026-11-08
 
 ### Added

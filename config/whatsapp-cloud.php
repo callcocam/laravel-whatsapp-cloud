@@ -40,6 +40,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Received media
+    |--------------------------------------------------------------------------
+    |
+    | The largest file CloudApiClient::downloadMedia() accepts when the caller
+    | does not say otherwise. Meta lets people send documents up to 100 MB; an
+    | app rarely wants that much in memory.
+    |
+    */
+
+    'media' => [
+        'max_download_bytes' => (int) env('WHATSAPP_CLOUD_MEDIA_MAX_DOWNLOAD_BYTES', 16 * 1024 * 1024),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Meta App identity
     |--------------------------------------------------------------------------
     |

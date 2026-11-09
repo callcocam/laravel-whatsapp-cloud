@@ -22,6 +22,12 @@ use Illuminate\Support\Str;
  */
 final class InboundPayloadFactory
 {
+    /**
+     * Ids of documents made here start with this, so the sandbox download hands
+     * back a PDF ({@see SandboxMediaDownloader}).
+     */
+    public const DOCUMENT_MEDIA_PREFIX = 'media.SANDBOX.DOC.';
+
     public function __construct(
         private readonly string $phoneNumberId,
         private readonly string $displayPhoneNumber,
@@ -115,18 +121,18 @@ final class InboundPayloadFactory
     }
 
     /**
-     * An inbound image. Media is referenced by id — the sandbox never uploads
-     * anything, and an app that blindly downloads media will notice here rather
-     * than in production.
+     * An inbound image. Media is referenced by id; the sandbox download of it
+     * answers the bundled sample JPEG unless the test put another file there
+     * ({@see SandboxMediaDownloader::put()}).
      *
      * @return array<string, mixed>
      */
-    public function image(?string $caption = null, ?string $replyTo = null): array
+    public function image(?string $caption = null, ?string $replyTo = null, ?string $mediaId = null): array
     {
         $image = [
             'mime_type' => 'image/jpeg',
             'sha256' => hash('sha256', 'sandbox-image'),
-            'id' => 'media.SANDBOX.'.Str::ulid(),
+            'id' => $mediaId ?? 'media.SANDBOX.'.Str::ulid(),
         ];
 
         if ($caption !== null) {
@@ -134,6 +140,29 @@ final class InboundPayloadFactory
         }
 
         return $this->message(['type' => 'image', 'image' => $image], $replyTo);
+    }
+
+    /**
+     * An inbound document (a PDF, say). The sandbox download of its id answers
+     * the bundled sample PDF unless the test put another file there
+     * ({@see SandboxMediaDownloader::put()}).
+     *
+     * @return array<string, mixed>
+     */
+    public function document(string $filename = 'document.pdf', string $mimeType = 'application/pdf', ?string $caption = null, ?string $replyTo = null, ?string $mediaId = null): array
+    {
+        $document = [
+            'filename' => $filename,
+            'mime_type' => $mimeType,
+            'sha256' => hash('sha256', 'sandbox-document'),
+            'id' => $mediaId ?? self::DOCUMENT_MEDIA_PREFIX.Str::ulid(),
+        ];
+
+        if ($caption !== null) {
+            $document['caption'] = $caption;
+        }
+
+        return $this->message(['type' => 'document', 'document' => $document], $replyTo);
     }
 
     /**

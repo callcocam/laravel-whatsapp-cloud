@@ -2,11 +2,14 @@
 
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
+use Callcocam\WhatsAppCloud\Exceptions\MediaDownloadException;
 use Callcocam\WhatsAppCloud\Facades\WhatsApp;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
+use Callcocam\WhatsAppCloud\Sandbox\InboundPayloadFactory;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxConversation;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxMessage;
 use Callcocam\WhatsAppCloud\Sandbox\Sandbox;
+use Callcocam\WhatsAppCloud\Sandbox\SandboxMediaDownloader;
 use Callcocam\WhatsAppCloud\Templates\MetaTemplate;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -281,4 +284,24 @@ it('echoes the payload the send chose when a template quick reply is tapped', fu
 
     unlink($dir.'/coordena_check.php');
     rmdir($dir);
+});
+
+it('downloads a received file without leaving the machine: the one put under the id, or the bundled sample', function () {
+    $client = WhatsApp::for();
+    $factory = InboundPayloadFactory::for(WhatsApp::credentials(), '5548999999999', 'Maria');
+
+    SandboxMediaDownloader::put('media.SANDBOX.receipt', 'my-photo', 'image/png');
+
+    $put = $client->downloadMedia('media.SANDBOX.receipt');
+    $documentId = $factory->document('comprovante.pdf')['entry'][0]['changes'][0]['value']['messages'][0]['document']['id'];
+    $imageId = $factory->image()['entry'][0]['changes'][0]['value']['messages'][0]['image']['id'];
+
+    expect($put->contents)->toBe('my-photo')
+        ->and($put->mimeType)->toBe('image/png')
+        ->and($client->downloadMedia($documentId)->mimeType)->toBe('application/pdf')
+        ->and($client->downloadMedia($documentId)->contents)->toStartWith('%PDF')
+        ->and($client->downloadMedia($imageId)->mimeType)->toBe('image/jpeg');
+
+    expect(fn () => $client->downloadMedia($imageId, 10))->toThrow(MediaDownloadException::class)
+        ->and(fn () => $client->downloadMedia($imageId, null, ['application/pdf']))->toThrow(MediaDownloadException::class);
 });

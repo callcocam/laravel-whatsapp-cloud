@@ -115,6 +115,27 @@ Na definição do template, `->headerDocument('/caminho/exemplo.pdf')`: o
 `whatsapp:template:create` sobe o exemplo pela Resumable Upload API (precisa de
 `WHATSAPP_CLOUD_APP_ID`) e envia o `header_handle` que a Meta exige para revisar.
 
+### Baixar um arquivo recebido (foto, PDF)
+
+O webhook traz só o id da mídia; `InboundMedia::fromMessage()` lê o que chegou
+(`image` ou `document`) e `downloadMedia()` busca os bytes (a URL da Meta vale
+uns 5 minutos e exige o mesmo token):
+
+```php
+use Callcocam\WhatsAppCloud\Messages\InboundMedia;
+
+$media = InboundMedia::fromMessage($event->message); // null se não for imagem/documento
+
+$file = WhatsApp::for($team)->downloadMedia($media->id, 5 * 1024 * 1024, ['image/jpeg', 'image/png', 'application/pdf']);
+$file->contents; $file->mimeType; $file->sha256; $file->size;
+```
+
+Arquivo grande demais ou de tipo não permitido levanta `MediaDownloadException`
+(`reason`: `too_large`/`type_not_allowed`, terminal). Sem `$maxBytes` vale
+`whatsapp-cloud.media.max_download_bytes` (16 MB). No `sandbox` nada sai da
+máquina: o download devolve o que o teste guardou com
+`SandboxMediaDownloader::put($id, $bytes, $mime)` ou um JPEG/PDF de exemplo.
+
 ### Tratar erros da Meta
 
 ```php

@@ -2,6 +2,8 @@
 
 use Callcocam\WhatsAppCloud\CloudApiClient;
 use Callcocam\WhatsAppCloud\Exceptions\CloudApiException;
+use Callcocam\WhatsAppCloud\Exceptions\MediaDownloadException;
+use Callcocam\WhatsAppCloud\Messages\InboundMedia;
 use Callcocam\WhatsAppCloud\Messages\InteractiveMessage;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
 use Callcocam\WhatsAppCloud\Templates\MetaTemplate;
@@ -251,4 +253,68 @@ it('fails the upload with Meta error code', function () {
 
     expect(fn () => makeClient()->uploadMedia('x', 'application/pdf', 'r.pdf'))
         ->toThrow(CloudApiException::class);
+});
+
+it('downloads a received file through the temporary url, with the token', function () {
+    Http::fake([
+        'graph.facebook.com/v21.0/media-555*' => Http::response(['url' => 'https://lookaside.fbsbx.com/whatsapp/file-555', 'mime_type' => 'image/jpeg', 'file_size' => 9, 'id' => 'media-555']),
+        'lookaside.fbsbx.com/*' => Http::response('jpeg-data'),
+    ]);
+
+    $media = makeClient()->downloadMedia('media-555', 1024, ['image/jpeg', 'application/pdf']);
+
+    expect($media->contents)->toBe('jpeg-data')
+        ->and($media->mimeType)->toBe('image/jpeg')
+        ->and($media->size)->toBe(9)
+        ->and($media->sha256)->toBe(hash('sha256', 'jpeg-data'));
+
+    Http::assertSent(fn (Request $request) => str_starts_with($request->url(), 'https://graph.facebook.com/v21.0/media-555?phone_number_id=111222333')
+        && $request->hasHeader('Authorization', 'Bearer the-token'));
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://lookaside.fbsbx.com/whatsapp/file-555'
+        && $request->hasHeader('Authorization', 'Bearer the-token'));
+});
+
+it('refuses a received file of a type not allowed without downloading it', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['url' => 'https://lookaside.fbsbx.com/x', 'mime_type' => 'audio/ogg', 'file_size' => 10])]);
+
+    expect(fn () => makeClient()->downloadMedia('media-1', 1024, ['image/jpeg']))
+        ->toThrow(fn (MediaDownloadException $e) => expect($e->reason)->toBe(MediaDownloadException::TYPE_NOT_ALLOWED)->and($e->isTerminal())->toBeTrue());
+
+    Http::assertSentCount(1);
+});
+
+it('refuses a received file larger than allowed, by the size Meta announces and by what arrives', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['url' => 'https://lookaside.fbsbx.com/x', 'mime_type' => 'image/jpeg', 'file_size' => 2048])]);
+
+    expect(fn () => makeClient()->downloadMedia('media-1', 1024))
+        ->toThrow(fn (MediaDownloadException $e) => expect($e->reason)->toBe(MediaDownloadException::TOO_LARGE));
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response(['url' => 'https://lookaside.fbsbx.com/y', 'mime_type' => 'image/jpeg']),
+        'lookaside.fbsbx.com/*' => Http::response(str_repeat('a', 2048)),
+    ]);
+
+    expect(fn () => makeClient()->downloadMedia('media-2', 1024))
+        ->toThrow(MediaDownloadException::class);
+});
+
+it('fails the download with Meta error code', function () {
+    Http::fake(['graph.facebook.com/*' => Http::response(['error' => ['message' => 'Media not found', 'code' => 100]], 404)]);
+
+    expect(fn () => makeClient()->downloadMedia('media-gone'))->toThrow(CloudApiException::class);
+});
+
+it('reads the media part of an inbound image or document, and nothing else', function () {
+    $document = InboundMedia::fromMessage(['type' => 'document', 'document' => [
+        'id' => 'm-1', 'mime_type' => 'application/pdf', 'filename' => 'comprovante.pdf', 'caption' => 'depósito', 'sha256' => 'abc',
+    ]]);
+
+    expect($document->type)->toBe('document')
+        ->and($document->id)->toBe('m-1')
+        ->and($document->mimeType)->toBe('application/pdf')
+        ->and($document->filename)->toBe('comprovante.pdf')
+        ->and($document->caption)->toBe('depósito')
+        ->and(InboundMedia::fromMessage(['type' => 'image', 'image' => ['id' => 'm-2', 'mime_type' => 'image/jpeg']])->type)->toBe('image')
+        ->and(InboundMedia::fromMessage(['type' => 'audio', 'audio' => ['id' => 'm-3']]))->toBeNull()
+        ->and(InboundMedia::fromMessage(['type' => 'text', 'text' => ['body' => 'oi']]))->toBeNull();
 });

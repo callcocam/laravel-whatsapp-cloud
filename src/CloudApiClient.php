@@ -2,10 +2,13 @@
 
 namespace Callcocam\WhatsAppCloud;
 
+use Callcocam\WhatsAppCloud\Contracts\MediaDownloader;
 use Callcocam\WhatsAppCloud\Contracts\MediaUploader;
 use Callcocam\WhatsAppCloud\Contracts\MessageGateway;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentials;
+use Callcocam\WhatsAppCloud\Messages\DownloadedMedia;
+use Callcocam\WhatsAppCloud\Messages\InboundMedia;
 use Callcocam\WhatsAppCloud\Messages\InteractiveMessage;
 use Callcocam\WhatsAppCloud\Messages\SendResult;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
@@ -88,6 +91,21 @@ class CloudApiClient implements MessageGateway
     public function uploadMedia(string $contents, string $mimeType, string $filename): string
     {
         return app(MediaUploader::class)->upload($this->credentials(), $contents, $mimeType, $filename);
+    }
+
+    /**
+     * Download a file someone sent to the number ({@see InboundMedia::$id}).
+     * `$maxBytes` defaults to `whatsapp-cloud.media.max_download_bytes`; an empty
+     * `$allowedMimeTypes` accepts any type. Under the sandbox driver nothing
+     * leaves the machine.
+     *
+     * @param  list<string>  $allowedMimeTypes
+     */
+    public function downloadMedia(string $mediaId, ?int $maxBytes = null, array $allowedMimeTypes = []): DownloadedMedia
+    {
+        $maxBytes ??= (int) config('whatsapp-cloud.media.max_download_bytes', 16 * 1024 * 1024);
+
+        return app(MediaDownloader::class)->download($this->credentials(), $mediaId, $maxBytes, $allowedMimeTypes);
     }
 
     /**
