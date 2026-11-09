@@ -4,6 +4,8 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-09
+
 ### Added
 - **Media download.** `CloudApiClient::downloadMedia($mediaId, $maxBytes = null, $allowedMimeTypes = [])`
   fetches a file someone sent (`GET /{media-id}` → temporary URL → bytes, both with the
