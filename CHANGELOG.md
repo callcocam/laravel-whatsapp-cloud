@@ -4,6 +4,18 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-09
+
+### Added
+- **Sending a file as the contact in the sandbox.** A 📎 in the composer (speaking as the
+  contact) sends a chosen file: JPEG/PNG as `type: image`, anything else as
+  `type: document` with its filename; what is typed goes as the caption, and the open
+  bubble as `context.id`. The bytes are put under the media id, so the app's
+  `downloadMedia()` gets that very file (a real receipt, a PDF over the app's limit).
+  The bubble shows the photo or a link to the file (`GET messages/{message}/media`).
+  Same thing from a test: `Sandbox::sendMedia($conversation, $bytes, $mime, $filename)`.
+- `InboundPayloadFactory::image()` takes the mime type (`image/png`).
+
 ## [0.5.0] - 2026-11-09
 
 ### Added

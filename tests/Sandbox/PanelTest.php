@@ -3,6 +3,7 @@
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Facades\WhatsApp;
+use Callcocam\WhatsAppCloud\Messages\InboundMedia;
 use Callcocam\WhatsAppCloud\Messages\InteractiveMessage;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxConversation;
@@ -10,6 +11,7 @@ use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxMessage;
 use Callcocam\WhatsAppCloud\Sandbox\Sandbox;
 use Callcocam\WhatsAppCloud\Templates\MetaTemplate;
 use Illuminate\Auth\GenericUser;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
@@ -304,4 +306,71 @@ it('echoes a row description in list_reply only when the row had one, like Meta'
             'title' => 'Registrar donativos da s',
             'description' => 'Registrar donativos da semana',
         ]);
+});
+
+it('sends a chosen photo as the contact, and the app downloads that very file', function () {
+    $seen = null;
+    Event::listen(WhatsAppMessageReceived::class, function ($event) use (&$seen) {
+        $seen = $event->message;
+    });
+
+    $maria = app(Sandbox::class)->participant('5548999999999', 'Maria');
+    $photo = UploadedFile::fake()->image('comprovante.png');
+
+    $this->post('whatsapp/cloud/sandbox/media', [
+        'conversation' => $maria->id,
+        'file' => $photo,
+        'caption' => 'Depósito de hoje',
+        'reply_to' => 'wamid.SANDBOX.ABC',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $media = InboundMedia::fromMessage($seen);
+
+    expect($seen['type'])->toBe('image')
+        ->and($media->mimeType)->toBe('image/png')
+        ->and($media->caption)->toBe('Depósito de hoje')
+        ->and($seen['context']['id'])->toBe('wamid.SANDBOX.ABC')
+        ->and(WhatsApp::for()->downloadMedia($media->id)->contents)->toBe($photo->get());
+});
+
+it('sends any other file as a document with its name', function () {
+    $seen = null;
+    Event::listen(WhatsAppMessageReceived::class, function ($event) use (&$seen) {
+        $seen = $event->message;
+    });
+
+    $maria = app(Sandbox::class)->participant('5548999999999', 'Maria');
+    $pdf = UploadedFile::fake()->createWithContent('extrato.pdf', "%PDF-1.4\n%%EOF\n");
+
+    $this->post('whatsapp/cloud/sandbox/media', ['conversation' => $maria->id, 'file' => $pdf])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($seen['type'])->toBe('document')
+        ->and($seen['document']['filename'])->toBe('extrato.pdf')
+        ->and($seen['document']['mime_type'])->toBe('application/pdf')
+        ->and($seen['document'])->not->toHaveKey('caption');
+});
+
+it('shows the sent file in the bubble', function () {
+    $maria = app(Sandbox::class)->participant('5548999999999', 'Maria');
+    app(Sandbox::class)->sendMedia($maria, 'PNGBYTES', 'image/png', 'foto.png');
+
+    $message = SandboxMessage::sole();
+
+    expect($this->getJson('whatsapp/cloud/sandbox/state?conversation='.$maria->id)->json('messages.0.media'))
+        ->toMatchArray(['kind' => 'image', 'mime_type' => 'image/png']);
+
+    $this->get("whatsapp/cloud/sandbox/messages/{$message->id}/media")
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/png');
+});
+
+it('asks for a file when none came', function () {
+    $maria = app(Sandbox::class)->participant('5548999999999', 'Maria');
+
+    $this->post('whatsapp/cloud/sandbox/media', ['conversation' => $maria->id])
+        ->assertSessionHasErrors('sandbox');
+
+    expect(SandboxMessage::count())->toBe(0);
 });

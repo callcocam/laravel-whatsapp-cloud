@@ -28,6 +28,10 @@ Route::post('/participants/import', [SandboxController::class, 'importRecipients
 // The person answers.
 Route::post('/reply', [SandboxController::class, 'reply'])->name('reply');
 Route::post('/tap', [SandboxController::class, 'tap'])->name('tap');
+Route::post('/media', [SandboxController::class, 'sendMedia'])->name('media');
+
+// The file a photo or document message carries, for the bubble to show.
+Route::get('/messages/{message}/media', [SandboxController::class, 'media'])->name('messages.media');
 
 // The system speaks first — for rehearsing a round the app itself would normally
 // start (and for the operator-initiated flow).

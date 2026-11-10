@@ -11,10 +11,13 @@ use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxConversation;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxMessage;
 use Callcocam\WhatsAppCloud\Sandbox\ResolvedTemplate;
 use Callcocam\WhatsAppCloud\Sandbox\Sandbox;
+use Callcocam\WhatsAppCloud\Sandbox\SandboxMediaDownloader;
 use Callcocam\WhatsAppCloud\Sandbox\TemplateDefinitions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Http\UploadedFile;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -114,6 +117,49 @@ class SandboxController
             (string) $request->input('text'),
             $this->replyTo($request),
         ));
+    }
+
+    /**
+     * The person sends a photo or a file. Its bytes are what the app downloads
+     * afterwards, so a real receipt or a too-big PDF can be tried on the app as is.
+     */
+    public function sendMedia(Request $request): RedirectResponse
+    {
+        $file = $request->file('file');
+
+        if (! $file instanceof UploadedFile || ! $file->isValid()) {
+            return back()->withErrors(['sandbox' => 'Escolha um arquivo (o envio falhou ou passou do limite de upload do PHP).']);
+        }
+
+        $conversation = $this->conversation($request);
+        $caption = trim((string) $request->input('caption'));
+
+        return $this->run(fn () => $this->sandbox->sendMedia(
+            $conversation,
+            (string) $file->get(),
+            $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream'),
+            $file->getClientOriginalName() ?: 'arquivo',
+            $caption !== '' ? $caption : null,
+            $this->replyTo($request),
+        ));
+    }
+
+    /**
+     * The file of a photo or document message, as the app's download would get it.
+     */
+    public function media(SandboxMessage $message, SandboxMediaDownloader $downloader): HttpResponse
+    {
+        $mediaId = $this->mediaOf($message)['id'] ?? null;
+
+        abort_if($mediaId === null, 404);
+
+        $media = $downloader->download(WhatsApp::credentials(), $mediaId, PHP_INT_MAX);
+
+        return response($media->contents, 200, [
+            'Content-Type' => $media->mimeType,
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     /**
@@ -330,6 +376,9 @@ class SandboxController
             'error_code' => $message->error_code,
             'at' => $message->created_at?->toIso8601String(),
 
+            // A photo or file the contact sent: what to draw in the bubble.
+            'media' => $this->mediaOf($message),
+
             'template' => $template === null ? null : [
                 'name' => $message->template_name,
                 'header' => $template->headerText(),
@@ -396,6 +445,28 @@ class SandboxController
         }
 
         return $options;
+    }
+
+    /**
+     * The `image` or `document` part of an inbound message, or null.
+     *
+     * @return array{id: string, kind: string, mime_type: string, filename: string|null}|null
+     */
+    private function mediaOf(SandboxMessage $message): ?array
+    {
+        $inbound = (array) data_get($message->inbound_payload, 'entry.0.changes.0.value.messages.0', []);
+        $kind = (string) ($inbound['type'] ?? '');
+
+        if (! in_array($kind, ['image', 'document'], true) || ! is_string(data_get($inbound, $kind.'.id'))) {
+            return null;
+        }
+
+        return [
+            'id' => (string) data_get($inbound, $kind.'.id'),
+            'kind' => $kind,
+            'mime_type' => (string) data_get($inbound, $kind.'.mime_type'),
+            'filename' => data_get($inbound, $kind.'.filename'),
+        ];
     }
 
     private function conversation(Request $request): SandboxConversation

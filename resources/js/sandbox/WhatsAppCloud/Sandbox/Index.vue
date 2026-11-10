@@ -116,6 +116,34 @@ function say() {
         : act('send-text', { text })
 }
 
+/* ---------- the contact sends a photo or a file ----------
+ * The chosen file is what the app downloads afterwards — a real receipt, a PNG, a
+ * PDF too big for the app's limit. What is typed in the box goes as the caption. */
+const fileInput = ref(null)
+
+function sendFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    const caption = draft.value.trim()
+    draft.value = ''
+
+    const replyTo = inspected.value?.direction === 'outbound' ? inspected.value.wamid : null
+
+    router.post(`${panelUrl.value}/media`, {
+        conversation: state.value.selected,
+        file,
+        caption,
+        reply_to: replyTo,
+    }, {
+        forceFormData: true,
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: poll,
+    })
+}
+
 /* ---------- sending a template as the system ---------- */
 
 const picked = ref(null)
@@ -330,6 +358,7 @@ const withDays = computed(() => {
                             <Bubble
                                 :message="message"
                                 :selected="inspected?.id === message.id"
+                                :panel-url="panelUrl"
                                 @inspect="inspected = $event"
                                 @tap="act('tap', $event)"
                             />
@@ -347,6 +376,19 @@ const withDays = computed(() => {
                         </div>
 
                         <div class="sb-input">
+                            <template v-if="speaker === 'contact'">
+                                <input
+                                    ref="fileInput"
+                                    type="file"
+                                    hidden
+                                    @change="sendFile"
+                                >
+                                <button
+                                    class="btn"
+                                    title="Enviar foto ou arquivo como o contato (o texto digitado vira a legenda)"
+                                    @click="fileInput?.click()"
+                                >📎</button>
+                            </template>
                             <textarea
                                 ref="composer"
                                 v-model="draft"
