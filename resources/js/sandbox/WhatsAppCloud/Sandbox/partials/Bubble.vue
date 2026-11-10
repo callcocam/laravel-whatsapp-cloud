@@ -5,6 +5,7 @@ import { clockOf, formatWa, tickOf } from './format'
 const props = defineProps({
     message: { type: Object, required: true },
     selected: { type: Boolean, default: false },
+    panelUrl: { type: String, default: '' },
 })
 
 const emit = defineEmits(['tap', 'inspect'])
@@ -22,6 +23,9 @@ const buttons = computed(() =>
     })),
 )
 
+/* The photo or file the contact sent, served as the app's download gets it. */
+const mediaUrl = computed(() => props.message.media ? `${props.panelUrl}/messages/${props.message.id}/media` : null)
+
 /* Only a message WE sent can be replied to. */
 const canTap = computed(() => out.value && props.message.status !== 'failed')
 </script>
@@ -37,7 +41,22 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
 
             <div v-if="message.template?.header" class="b-header" v-html="formatWa(message.template.header)" />
 
-            <div class="b-body" v-html="formatWa(message.text)" />
+            <a
+                v-if="message.media?.kind === 'image'"
+                class="b-media"
+                :href="mediaUrl"
+                target="_blank"
+                @click.stop
+            ><img :src="mediaUrl" alt=""></a>
+            <a
+                v-else-if="message.media"
+                class="b-doc"
+                :href="mediaUrl"
+                target="_blank"
+                @click.stop
+            >📄 {{ message.media.filename || message.media.mime_type }}</a>
+
+            <div v-if="message.text || !message.media" class="b-body" v-html="formatWa(message.text)" />
 
             <div v-if="message.template?.footer" class="b-footer">{{ message.template.footer }}</div>
 

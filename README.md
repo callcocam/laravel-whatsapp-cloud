@@ -134,7 +134,9 @@ Arquivo grande demais ou de tipo não permitido levanta `MediaDownloadException`
 (`reason`: `too_large`/`type_not_allowed`, terminal). Sem `$maxBytes` vale
 `whatsapp-cloud.media.max_download_bytes` (16 MB). No `sandbox` nada sai da
 máquina: o download devolve o que o teste guardou com
-`SandboxMediaDownloader::put($id, $bytes, $mime)` ou um JPEG/PDF de exemplo.
+`SandboxMediaDownloader::put($id, $bytes, $mime)` ou um JPEG/PDF de exemplo. Na
+tela do sandbox, o 📎 manda um arquivo seu como o contato (`Sandbox::sendMedia()`
+num teste), e é esse arquivo que o download devolve.
 
 ### Tratar erros da Meta
 

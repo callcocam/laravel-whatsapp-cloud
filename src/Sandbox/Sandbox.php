@@ -6,6 +6,7 @@ use Callcocam\WhatsAppCloud\Facades\WhatsApp;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxConversation;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxMessage;
 use Callcocam\WhatsAppCloud\WhatsAppManager;
+use Illuminate\Support\Str;
 
 /**
  * The sandbox, as a thing you can drive: from the screen, from a test, from
@@ -18,6 +19,11 @@ use Callcocam\WhatsAppCloud\WhatsAppManager;
  */
 class Sandbox
 {
+    /**
+     * What WhatsApp sends as a photo. Everything else goes as a document.
+     */
+    public const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png'];
+
     public function __construct(
         private readonly WhatsAppManager $whatsapp,
         private readonly WebhookSimulator $simulator,
@@ -52,6 +58,37 @@ class Sandbox
             $this->factory($conversation)->text($text, $replyTo),
             type: 'text',
             rendered: $text,
+        );
+    }
+
+    /**
+     * The person sends a file: a photo (JPEG or PNG) comes back as `type: image`,
+     * anything else as `type: document`, exactly as Meta splits them. The bytes are
+     * put under the media id ({@see SandboxMediaDownloader::put()}), so when the app
+     * downloads what it received, it gets THIS file.
+     */
+    public function sendMedia(
+        SandboxConversation $conversation,
+        string $contents,
+        string $mimeType,
+        string $filename,
+        ?string $caption = null,
+        ?string $replyTo = null,
+    ): SimulatedWebhook {
+        $isImage = in_array($mimeType, self::IMAGE_MIME_TYPES, true);
+        $mediaId = ($isImage ? 'media.SANDBOX.' : InboundPayloadFactory::DOCUMENT_MEDIA_PREFIX).Str::ulid();
+
+        SandboxMediaDownloader::put($mediaId, $contents, $mimeType);
+
+        $factory = $this->factory($conversation);
+
+        return $this->deliver(
+            $conversation,
+            $isImage
+                ? $factory->image($caption, $replyTo, $mediaId, $mimeType)
+                : $factory->document($filename, $mimeType, $caption, $replyTo, $mediaId),
+            type: $isImage ? 'image' : 'document',
+            rendered: $caption ?? '',
         );
     }
 

@@ -127,10 +127,10 @@ final class InboundPayloadFactory
      *
      * @return array<string, mixed>
      */
-    public function image(?string $caption = null, ?string $replyTo = null, ?string $mediaId = null): array
+    public function image(?string $caption = null, ?string $replyTo = null, ?string $mediaId = null, string $mimeType = 'image/jpeg'): array
     {
         $image = [
-            'mime_type' => 'image/jpeg',
+            'mime_type' => $mimeType,
             'sha256' => hash('sha256', 'sandbox-image'),
             'id' => $mediaId ?? 'media.SANDBOX.'.Str::ulid(),
         ];
