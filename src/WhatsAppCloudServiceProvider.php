@@ -8,6 +8,9 @@ use Callcocam\WhatsAppCloud\Console\InstallCommand;
 use Callcocam\WhatsAppCloud\Console\ListTemplates;
 use Callcocam\WhatsAppCloud\Console\ScaffoldPanel;
 use Callcocam\WhatsAppCloud\Console\SendTemplate;
+use Callcocam\WhatsAppCloud\Contracts\AudioTranscriber;
+use Callcocam\WhatsAppCloud\Contracts\InboundAudioHandler;
+use Callcocam\WhatsAppCloud\Contracts\InboundFileHandler;
 use Callcocam\WhatsAppCloud\Contracts\MediaDownloader;
 use Callcocam\WhatsAppCloud\Contracts\MediaUploader;
 use Callcocam\WhatsAppCloud\Contracts\MessageTransport;
@@ -15,7 +18,13 @@ use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Contracts\WhatsAppCredentialsResolver;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Http\Middleware\RequireConfiguredGate;
+use Callcocam\WhatsAppCloud\Listeners\HandleInboundMedia;
 use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
+use Callcocam\WhatsAppCloud\Media\CloudflareAudioTranscriber;
+use Callcocam\WhatsAppCloud\Media\DefaultAudioHandler;
+use Callcocam\WhatsAppCloud\Media\DefaultFileHandler;
+use Callcocam\WhatsAppCloud\Media\NullAudioTranscriber;
+use Callcocam\WhatsAppCloud\Media\OpenAiAudioTranscriber;
 use Callcocam\WhatsAppCloud\Models\WhatsAppNumber;
 use Callcocam\WhatsAppCloud\Onboarding\EmbeddedSignup;
 use Callcocam\WhatsAppCloud\Sandbox\SandboxMediaDownloader;
@@ -71,6 +80,8 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
 
         $this->app->alias(WhatsAppManager::class, 'whatsapp-cloud');
 
+        $this->registerMediaHandlers();
+
         $this->app->singleton(SettingsStore::class, fn ($app) => new SettingsStore($app['config']));
 
         $this->app->bind(EmbeddedSignup::class, fn ($app) => new EmbeddedSignup(
@@ -79,6 +90,40 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
             appSecret: $app['config']->get('whatsapp-cloud.app_secret'),
             model: $app['config']->get('whatsapp-cloud.model', WhatsAppNumber::class),
         ));
+    }
+
+    /**
+     * What happens to a received photo, document or audio, when the app turned
+     * that kind on (`whatsapp-cloud.media.handle`). The defaults only answer the
+     * person; an app binds its own handlers to put the files to use.
+     */
+    protected function registerMediaHandlers(): void
+    {
+        $this->app->bind(InboundFileHandler::class, DefaultFileHandler::class);
+        $this->app->bind(InboundAudioHandler::class, DefaultAudioHandler::class);
+
+        $this->app->bind(AudioTranscriber::class, function ($app) {
+            $config = $app['config'];
+            $driver = $config->get('whatsapp-cloud.media.transcriber');
+
+            return match ($driver) {
+                null, '', 'none' => new NullAudioTranscriber,
+                'openai' => new OpenAiAudioTranscriber(
+                    apiKey: (string) $config->get('whatsapp-cloud.media.openai.api_key'),
+                    model: (string) $config->get('whatsapp-cloud.media.openai.model', 'whisper-1'),
+                    language: $config->get('whatsapp-cloud.media.openai.language'),
+                ),
+                'cloudflare' => new CloudflareAudioTranscriber(
+                    accountId: (string) $config->get('whatsapp-cloud.media.cloudflare.account_id'),
+                    token: (string) $config->get('whatsapp-cloud.media.cloudflare.token'),
+                    model: (string) $config->get('whatsapp-cloud.media.cloudflare.model', '@cf/openai/whisper-large-v3-turbo'),
+                    language: $config->get('whatsapp-cloud.media.cloudflare.language'),
+                ),
+                default => throw new InvalidArgumentException(
+                    "Unknown whatsapp-cloud transcriber [{$driver}]. Expected 'cloudflare', 'openai' or none — or bind your own AudioTranscriber.",
+                ),
+            };
+        });
     }
 
     /**
@@ -142,6 +187,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         $this->registerSetupRoutes();
         $this->registerSandboxRoutes();
         $this->registerInboundStore();
+        $this->registerMediaListener();
         $this->registerPublishing();
 
         if ($this->app->runningInConsole()) {
@@ -323,6 +369,16 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
         }
 
         Event::listen(WhatsAppMessageReceived::class, StoreInboundMessage::class);
+    }
+
+    /**
+     * Always listening, and cheap when off: the listener queues nothing unless the
+     * message carries a kind turned on in `whatsapp-cloud.media.handle` — so the
+     * switch can be flipped at runtime (the setup panel, a test) without a reboot.
+     */
+    protected function registerMediaListener(): void
+    {
+        Event::listen(WhatsAppMessageReceived::class, HandleInboundMedia::class);
     }
 
     protected function registerPublishing(): void

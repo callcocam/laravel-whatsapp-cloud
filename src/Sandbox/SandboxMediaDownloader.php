@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Cache;
  * The download that goes nowhere. A file put here under an id
  * ({@see self::put()}) comes back as is, so a test or the sandbox can hand the app
  * the exact photo it needs; any other id gets the bundled sample: a PDF when the
- * id was made by {@see InboundPayloadFactory::document()}, a JPEG otherwise. Same
+ * id was made by {@see InboundPayloadFactory::document()}, an Ogg/Opus voice note
+ * for {@see InboundPayloadFactory::audio()}, a JPEG otherwise. Same
  * size and type checks as the real download, same production guard as
  * {@see SandboxTransport}.
  */
@@ -61,11 +62,12 @@ class SandboxMediaDownloader implements MediaDownloader
 
     private function sample(string $mediaId): DownloadedMedia
     {
-        $isDocument = str_starts_with($mediaId, InboundPayloadFactory::DOCUMENT_MEDIA_PREFIX);
+        [$file, $mimeType] = match (true) {
+            str_starts_with($mediaId, InboundPayloadFactory::DOCUMENT_MEDIA_PREFIX) => ['sample.pdf', 'application/pdf'],
+            str_starts_with($mediaId, InboundPayloadFactory::AUDIO_MEDIA_PREFIX) => ['sample.ogg', 'audio/ogg; codecs=opus'],
+            default => ['sample.jpg', 'image/jpeg'],
+        };
 
-        return new DownloadedMedia(
-            (string) file_get_contents(__DIR__.'/../../resources/sandbox/'.($isDocument ? 'sample.pdf' : 'sample.jpg')),
-            $isDocument ? 'application/pdf' : 'image/jpeg',
-        );
+        return new DownloadedMedia((string) file_get_contents(__DIR__.'/../../resources/sandbox/'.$file), $mimeType);
     }
 }

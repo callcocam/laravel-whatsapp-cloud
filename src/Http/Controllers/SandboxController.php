@@ -5,6 +5,7 @@ namespace Callcocam\WhatsAppCloud\Http\Controllers;
 use Callcocam\WhatsAppCloud\Contracts\SandboxRecipientProvider;
 use Callcocam\WhatsAppCloud\Exceptions\WhatsAppException;
 use Callcocam\WhatsAppCloud\Facades\WhatsApp;
+use Callcocam\WhatsAppCloud\Messages\InboundMedia;
 use Callcocam\WhatsAppCloud\Sandbox\Fault;
 use Callcocam\WhatsAppCloud\Sandbox\FaultCatalog;
 use Callcocam\WhatsAppCloud\Sandbox\Models\SandboxConversation;
@@ -120,7 +121,8 @@ class SandboxController
     }
 
     /**
-     * The person sends a photo or a file. Its bytes are what the app downloads
+     * The person sends a photo, a file or a voice note (`voice`, recorded in the
+     * browser). Its bytes are what the app downloads
      * afterwards, so a real receipt or a too-big PDF can be tried on the app as is.
      */
     public function sendMedia(Request $request): RedirectResponse
@@ -133,19 +135,29 @@ class SandboxController
 
         $conversation = $this->conversation($request);
         $caption = trim((string) $request->input('caption'));
+        $voice = $request->boolean('voice');
+        $mimeType = $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream');
+
+        // A note recorded in the browser is WebM or Ogg with only an audio track,
+        // which content sniffing calls `video/…`. It is a voice note: say audio.
+        if ($voice && ! str_starts_with($mimeType, 'audio/')) {
+            $mimeType = 'audio/'.(explode('/', $mimeType, 2)[1] ?? 'ogg');
+        }
 
         return $this->run(fn () => $this->sandbox->sendMedia(
             $conversation,
             (string) $file->get(),
-            $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream'),
+            $mimeType,
             $file->getClientOriginalName() ?: 'arquivo',
             $caption !== '' ? $caption : null,
             $this->replyTo($request),
+            $voice,
         ));
     }
 
     /**
-     * The file of a photo or document message, as the app's download would get it.
+     * The file of a photo, document or audio message, as the app's download would
+     * get it.
      */
     public function media(SandboxMessage $message, SandboxMediaDownloader $downloader): HttpResponse
     {
@@ -448,16 +460,16 @@ class SandboxController
     }
 
     /**
-     * The `image` or `document` part of an inbound message, or null.
+     * The `image`, `document` or `audio` part of an inbound message, or null.
      *
-     * @return array{id: string, kind: string, mime_type: string, filename: string|null}|null
+     * @return array{id: string, kind: string, mime_type: string, filename: string|null, voice: bool}|null
      */
     private function mediaOf(SandboxMessage $message): ?array
     {
         $inbound = (array) data_get($message->inbound_payload, 'entry.0.changes.0.value.messages.0', []);
         $kind = (string) ($inbound['type'] ?? '');
 
-        if (! in_array($kind, ['image', 'document'], true) || ! is_string(data_get($inbound, $kind.'.id'))) {
+        if (! in_array($kind, InboundMedia::TYPES, true) || ! is_string(data_get($inbound, $kind.'.id'))) {
             return null;
         }
 
@@ -466,6 +478,7 @@ class SandboxController
             'kind' => $kind,
             'mime_type' => (string) data_get($inbound, $kind.'.mime_type'),
             'filename' => data_get($inbound, $kind.'.filename'),
+            'voice' => data_get($inbound, $kind.'.voice') === true,
         ];
     }
 

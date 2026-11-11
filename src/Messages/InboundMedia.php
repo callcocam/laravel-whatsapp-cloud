@@ -7,14 +7,18 @@ use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 /**
  * The media part of an inbound message ({@see WhatsAppMessageReceived::$message}):
  * which kind, the id to download it with, and what the sender typed along with it.
- * Only `image` and `document` are read; anything else (audio, sticker, video) is
- * not media an app here asks for.
+ * `image`, `document` and `audio` are read; anything else (sticker, video) is not
+ * media an app here asks for.
  */
 final class InboundMedia
 {
     public const IMAGE = 'image';
 
     public const DOCUMENT = 'document';
+
+    public const AUDIO = 'audio';
+
+    public const TYPES = [self::IMAGE, self::DOCUMENT, self::AUDIO];
 
     public function __construct(
         public readonly string $type,
@@ -23,7 +27,22 @@ final class InboundMedia
         public readonly ?string $sha256 = null,
         public readonly ?string $filename = null,
         public readonly ?string $caption = null,
+        public readonly bool $voice = false,
     ) {}
+
+    /**
+     * A voice note recorded in WhatsApp (Meta's `audio.voice`), as opposed to an
+     * audio file forwarded or picked from the phone.
+     */
+    public function isVoiceNote(): bool
+    {
+        return $this->type === self::AUDIO && $this->voice;
+    }
+
+    public function isAudio(): bool
+    {
+        return $this->type === self::AUDIO;
+    }
 
     /**
      * @param  array<string, mixed>  $message  a single entry of `value.messages[]`
@@ -32,7 +51,7 @@ final class InboundMedia
     {
         $type = $message['type'] ?? null;
 
-        if (! in_array($type, [self::IMAGE, self::DOCUMENT], true)) {
+        if (! in_array($type, self::TYPES, true)) {
             return null;
         }
 
@@ -49,6 +68,7 @@ final class InboundMedia
             sha256: is_string($media['sha256'] ?? null) ? $media['sha256'] : null,
             filename: is_string($media['filename'] ?? null) ? $media['filename'] : null,
             caption: is_string($media['caption'] ?? null) ? $media['caption'] : null,
+            voice: ($media['voice'] ?? false) === true,
         );
     }
 }

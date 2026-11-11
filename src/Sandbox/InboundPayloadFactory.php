@@ -28,6 +28,12 @@ final class InboundPayloadFactory
      */
     public const DOCUMENT_MEDIA_PREFIX = 'media.SANDBOX.DOC.';
 
+    /**
+     * Ids of audios made here start with this, so the sandbox download hands back
+     * an Ogg/Opus voice note ({@see SandboxMediaDownloader}).
+     */
+    public const AUDIO_MEDIA_PREFIX = 'media.SANDBOX.AUDIO.';
+
     public function __construct(
         private readonly string $phoneNumberId,
         private readonly string $displayPhoneNumber,
@@ -163,6 +169,26 @@ final class InboundPayloadFactory
         }
 
         return $this->message(['type' => 'document', 'document' => $document], $replyTo);
+    }
+
+    /**
+     * An inbound audio. `voice` is what WhatsApp sets on a note recorded in the
+     * app (Ogg/Opus); a forwarded audio file comes without it. The sandbox
+     * download of its id answers the bundled sample unless the test put another
+     * file there ({@see SandboxMediaDownloader::put()}).
+     *
+     * @return array<string, mixed>
+     */
+    public function audio(?string $replyTo = null, ?string $mediaId = null, string $mimeType = 'audio/ogg; codecs=opus', bool $voice = true): array
+    {
+        $audio = [
+            'mime_type' => $mimeType,
+            'sha256' => hash('sha256', 'sandbox-audio'),
+            'id' => $mediaId ?? self::AUDIO_MEDIA_PREFIX.Str::ulid(),
+            'voice' => $voice,
+        ];
+
+        return $this->message(['type' => 'audio', 'audio' => $audio], $replyTo);
     }
 
     /**

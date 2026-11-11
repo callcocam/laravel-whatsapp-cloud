@@ -23,7 +23,7 @@ const buttons = computed(() =>
     })),
 )
 
-/* The photo or file the contact sent, served as the app's download gets it. */
+/* The photo, file or audio the contact sent, served as the app's download gets it. */
 const mediaUrl = computed(() => props.message.media ? `${props.panelUrl}/messages/${props.message.id}/media` : null)
 
 /* Only a message WE sent can be replied to. */
@@ -48,6 +48,14 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
                 target="_blank"
                 @click.stop
             ><img :src="mediaUrl" alt=""></a>
+            <div
+                v-else-if="message.media?.kind === 'audio'"
+                class="b-audio"
+                @click.stop
+            >
+                <span>{{ message.media.voice ? '🎤' : '🎵' }}</span>
+                <audio :src="mediaUrl" controls preload="none" />
+            </div>
             <a
                 v-else-if="message.media"
                 class="b-doc"

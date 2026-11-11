@@ -115,16 +115,16 @@ Na definição do template, `->headerDocument('/caminho/exemplo.pdf')`: o
 `whatsapp:template:create` sobe o exemplo pela Resumable Upload API (precisa de
 `WHATSAPP_CLOUD_APP_ID`) e envia o `header_handle` que a Meta exige para revisar.
 
-### Baixar um arquivo recebido (foto, PDF)
+### Baixar um arquivo recebido (foto, PDF, áudio)
 
 O webhook traz só o id da mídia; `InboundMedia::fromMessage()` lê o que chegou
-(`image` ou `document`) e `downloadMedia()` busca os bytes (a URL da Meta vale
+(`image`, `document` ou `audio`; `isVoiceNote()` diz se foi gravado no app) e `downloadMedia()` busca os bytes (a URL da Meta vale
 uns 5 minutos e exige o mesmo token):
 
 ```php
 use Callcocam\WhatsAppCloud\Messages\InboundMedia;
 
-$media = InboundMedia::fromMessage($event->message); // null se não for imagem/documento
+$media = InboundMedia::fromMessage($event->message); // null se não for imagem/documento/áudio
 
 $file = WhatsApp::for($team)->downloadMedia($media->id, 5 * 1024 * 1024, ['image/jpeg', 'image/png', 'application/pdf']);
 $file->contents; $file->mimeType; $file->sha256; $file->size;
@@ -134,9 +134,68 @@ Arquivo grande demais ou de tipo não permitido levanta `MediaDownloadException`
 (`reason`: `too_large`/`type_not_allowed`, terminal). Sem `$maxBytes` vale
 `whatsapp-cloud.media.max_download_bytes` (16 MB). No `sandbox` nada sai da
 máquina: o download devolve o que o teste guardou com
-`SandboxMediaDownloader::put($id, $bytes, $mime)` ou um JPEG/PDF de exemplo. Na
-tela do sandbox, o 📎 manda um arquivo seu como o contato (`Sandbox::sendMedia()`
-num teste), e é esse arquivo que o download devolve.
+`SandboxMediaDownloader::put($id, $bytes, $mime)` ou um JPEG/PDF/OGG de exemplo.
+Na tela do sandbox, o 📎 manda um arquivo seu como o contato e o 🎤 grava uma nota
+de voz (`Sandbox::sendMedia()` num teste), e é esse arquivo que o download devolve.
+
+### Responder a fotos, documentos e áudios recebidos
+
+Desligado por padrão. Ligue por tipo, e o pacote entrega cada arquivo recebido
+a um handler, na fila:
+
+```env
+WHATSAPP_CLOUD_IMAGES_ENABLED=true
+WHATSAPP_CLOUD_DOCUMENTS_ENABLED=true
+WHATSAPP_CLOUD_AUDIO_ENABLED=true
+```
+
+Os handlers padrão só **respondem** à pessoa, para ela saber que chegou:
+
+- documento: `Recebi seu documento 📄 *boleto.pdf* (PDF, 120 KB).` (+ a legenda)
+- foto: `Recebi sua imagem 🖼️ (85 KB).`
+- áudio: `Recebi seu áudio 🎤` — e, com um transcritor, `Você disse: "…"`
+
+Fora de produção a resposta termina com um aviso para o desenvolvedor
+(`WHATSAPP_CLOUD_MEDIA_HINT=false` tira). Os textos ficam em
+`whatsapp-cloud.media.replies`.
+
+Para **usar** o arquivo no app, troque o handler pelo seu:
+
+```php
+use Callcocam\WhatsAppCloud\Contracts\InboundAudioHandler;
+use Callcocam\WhatsAppCloud\Contracts\InboundFileHandler;
+use Callcocam\WhatsAppCloud\Messages\ReceivedMedia;
+
+// AppServiceProvider::register()
+$this->app->bind(InboundFileHandler::class, ImportarComprovante::class);
+$this->app->bind(InboundAudioHandler::class, LancarPorVoz::class);
+
+class ImportarComprovante implements InboundFileHandler
+{
+    public function handle(ReceivedMedia $file): void
+    {
+        $bytes = $file->download(5 * 1024 * 1024, ['application/pdf', 'image/jpeg']);
+        // $file->media (tipo, nome, legenda), $file->from, $file->contactName, $file->wamid
+        $file->reply('Comprovante importado ✅');
+    }
+}
+```
+
+**Transcrição.** `WHATSAPP_CLOUD_TRANSCRIBER=cloudflare` (com `CLOUDFLARE_ACCOUNT_ID` e
+`CLOUDFLARE_AI_TOKEN`, permissão Workers AI) usa o Whisper do Workers AI
+(`@cf/openai/whisper-large-v3-turbo`; troque em `WHATSAPP_CLOUD_TRANSCRIBE_CLOUDFLARE_MODEL`).
+`WHATSAPP_CLOUD_TRANSCRIBER=openai` (com `OPENAI_API_KEY`) usa o
+`/v1/audio/transcriptions` da OpenAI (`whisper-1`; troque em
+`WHATSAPP_CLOUD_TRANSCRIBE_MODEL`). Idioma: `WHATSAPP_CLOUD_TRANSCRIBE_LANGUAGE` (`pt`). Outro provedor: faça o bind de
+`Callcocam\WhatsAppCloud\Contracts\AudioTranscriber`. Seu handler de áudio pode
+receber o mesmo transcritor por injeção. Falha na transcrição não derruba nada: a
+pessoa recebe o "Recebi seu áudio" sem o texto.
+
+Os handlers rodam como listener na fila (`WHATSAPP_CLOUD_MEDIA_QUEUE_CONNECTION`,
+`WHATSAPP_CLOUD_MEDIA_QUEUE`), com uma tentativa só, para não responder duas vezes.
+Se o app já trata mídia no seu próprio listener de `WhatsAppMessageReceived`, deixe
+o tipo desligado aqui ou mova a lógica para o handler, senão a pessoa recebe duas
+respostas.
 
 ### Tratar erros da Meta
 
