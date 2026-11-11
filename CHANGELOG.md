@@ -4,6 +4,15 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-11
+
+### Changed
+- **Sandbox bubbles seen from the contact's phone**, as in WhatsApp: what the contact
+  sends is on the right in green, what the system sends on the left. On screens 1440px
+  and wider the sandbox sits in a centred box (max 1400px) over the WhatsApp green band,
+  so the chat no longer stretches edge to edge. Apps that published the page
+  (`whatsapp-cloud-sandbox`) carry their own copy and must update it themselves.
+
 ## [0.6.0] - 2026-11-09
 
 ### Added
