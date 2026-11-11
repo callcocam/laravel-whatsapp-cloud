@@ -290,8 +290,11 @@
 
 /* ---------- bubbles ---------- */
 
+/* Seen from the contact's phone, as in WhatsApp: what the contact sends
+ * (inbound) is on the right in green; what the system sends is on the left. */
+
 .wa-sandbox .row { display: flex; }
-.wa-sandbox .row.out { justify-content: flex-end; }
+.wa-sandbox .row.in { justify-content: flex-end; }
 
 .wa-sandbox .bubble {
     background: #ffffff;
@@ -306,14 +309,14 @@
     cursor: pointer;
 }
 
-.wa-sandbox .row.out .bubble {
+.wa-sandbox .row.in .bubble {
     background: #d9fdd3;
     border-radius: 8px 8px 0 8px;
 }
 
 @media (prefers-color-scheme: dark) {
     .wa-sandbox .bubble { background: #202c33; color: #e9edef; }
-    .wa-sandbox .row.out .bubble { background: #005c4b; }
+    .wa-sandbox .row.in .bubble { background: #005c4b; }
 }
 
 .wa-sandbox .bubble.is-on { outline: 2px solid var(--accent); }
@@ -619,4 +622,37 @@
 .wa-sandbox .sb-alert.terminal::after {
     content: " Terminal — a fila não deve retentar.";
     font-weight: 600;
+}
+
+/* ---------- frame: WhatsApp Web look on wide screens ---------- */
+
+/* On a big monitor the chat stretched edge to edge and the bubbles drifted far
+ * apart. Like WhatsApp Web, the app sits in a centred box over a green band. */
+@media (min-width: 1440px) {
+    .wa-sandbox {
+        box-sizing: border-box;
+        padding: 19px 0;
+        background: linear-gradient(#00a884 0 127px, #d1d7db 127px);
+    }
+
+    .wa-sandbox .sb-top,
+    .wa-sandbox .sb-body {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .wa-sandbox .sb-top {
+        border-radius: 6px 6px 0 0;
+    }
+
+    .wa-sandbox .sb-body {
+        box-shadow: 0 6px 18px rgba(11, 20, 26, 0.12);
+    }
+}
+
+@media (min-width: 1440px) and (prefers-color-scheme: dark) {
+    .wa-sandbox {
+        background: linear-gradient(#00a884 0 127px, #0c1317 127px);
+    }
 }
