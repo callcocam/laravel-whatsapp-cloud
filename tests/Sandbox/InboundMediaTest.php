@@ -104,6 +104,44 @@ it('says what the audio said when a transcriber is configured', function () {
         && $request->hasHeader('Authorization', 'Bearer sk-test'));
 });
 
+it('transcribes with Cloudflare Workers AI', function () {
+    config([
+        'whatsapp-cloud.media.handle.audio' => true,
+        'whatsapp-cloud.media.transcriber' => 'cloudflare',
+        'whatsapp-cloud.media.cloudflare.account_id' => 'acc-1',
+        'whatsapp-cloud.media.cloudflare.token' => 'cf-test',
+    ]);
+
+    Http::fake(['api.cloudflare.com/*' => Http::response([
+        'success' => true,
+        'result' => ['text' => ' Paguei a conta de luz '],
+    ])]);
+
+    $this->sandbox->sendMedia($this->conversation, 'ogg-bytes', 'audio/ogg; codecs=opus', 'voz.ogg', voice: true);
+
+    expect(lastAnswer())->toContain('Você disse: "Paguei a conta de luz"');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.cloudflare.com/client/v4/accounts/acc-1/ai/run/@cf/openai/whisper-large-v3-turbo'
+        && $request->hasHeader('Authorization', 'Bearer cf-test')
+        && $request['audio'] === base64_encode('ogg-bytes')
+        && $request['language'] === 'pt');
+});
+
+it('still answers when the Cloudflare transcription fails', function () {
+    config([
+        'whatsapp-cloud.media.handle.audio' => true,
+        'whatsapp-cloud.media.transcriber' => 'cloudflare',
+        'whatsapp-cloud.media.cloudflare.account_id' => 'acc-1',
+        'whatsapp-cloud.media.cloudflare.token' => 'bad',
+    ]);
+
+    Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false, 'errors' => [['message' => 'Authentication error']]], 401)]);
+
+    $this->sandbox->sendMedia($this->conversation, 'ogg-bytes', 'audio/ogg', 'voz.ogg', voice: true);
+
+    expect(lastAnswer())->toStartWith('Recebi seu áudio 🎤')->not->toContain('Você disse');
+});
+
 it('still answers when the transcription fails', function () {
     config([
         'whatsapp-cloud.media.handle.audio' => true,

@@ -181,9 +181,12 @@ class ImportarComprovante implements InboundFileHandler
 }
 ```
 
-**Transcrição.** `WHATSAPP_CLOUD_TRANSCRIBER=openai` (com `OPENAI_API_KEY`) usa o
-`/v1/audio/transcriptions` da OpenAI (`whisper-1`, idioma `pt`; troque em
-`WHATSAPP_CLOUD_TRANSCRIBE_MODEL`/`_LANGUAGE`). Outro provedor: faça o bind de
+**Transcrição.** `WHATSAPP_CLOUD_TRANSCRIBER=cloudflare` (com `CLOUDFLARE_ACCOUNT_ID` e
+`CLOUDFLARE_AI_TOKEN`, permissão Workers AI) usa o Whisper do Workers AI
+(`@cf/openai/whisper-large-v3-turbo`; troque em `WHATSAPP_CLOUD_TRANSCRIBE_CLOUDFLARE_MODEL`).
+`WHATSAPP_CLOUD_TRANSCRIBER=openai` (com `OPENAI_API_KEY`) usa o
+`/v1/audio/transcriptions` da OpenAI (`whisper-1`; troque em
+`WHATSAPP_CLOUD_TRANSCRIBE_MODEL`). Idioma: `WHATSAPP_CLOUD_TRANSCRIBE_LANGUAGE` (`pt`). Outro provedor: faça o bind de
 `Callcocam\WhatsAppCloud\Contracts\AudioTranscriber`. Seu handler de áudio pode
 receber o mesmo transcritor por injeção. Falha na transcrição não derruba nada: a
 pessoa recebe o "Recebi seu áudio" sem o texto.

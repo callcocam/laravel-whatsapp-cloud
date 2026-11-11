@@ -73,10 +73,17 @@ return [
 
         /*
         | How the default audio handler reads an audio: none (it only says the
-        | audio arrived) or `openai`. Any other provider: bind your own
-        | AudioTranscriber.
+        | audio arrived), `cloudflare` (Workers AI) or `openai`. Any other
+        | provider: bind your own AudioTranscriber.
         */
         'transcriber' => env('WHATSAPP_CLOUD_TRANSCRIBER'),
+
+        'cloudflare' => [
+            'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+            'token' => env('CLOUDFLARE_AI_TOKEN'),
+            'model' => env('WHATSAPP_CLOUD_TRANSCRIBE_CLOUDFLARE_MODEL', '@cf/openai/whisper-large-v3-turbo'),
+            'language' => env('WHATSAPP_CLOUD_TRANSCRIBE_LANGUAGE', 'pt'),
+        ],
 
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),

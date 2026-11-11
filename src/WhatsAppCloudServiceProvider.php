@@ -20,6 +20,7 @@ use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Http\Middleware\RequireConfiguredGate;
 use Callcocam\WhatsAppCloud\Listeners\HandleInboundMedia;
 use Callcocam\WhatsAppCloud\Listeners\StoreInboundMessage;
+use Callcocam\WhatsAppCloud\Media\CloudflareAudioTranscriber;
 use Callcocam\WhatsAppCloud\Media\DefaultAudioHandler;
 use Callcocam\WhatsAppCloud\Media\DefaultFileHandler;
 use Callcocam\WhatsAppCloud\Media\NullAudioTranscriber;
@@ -112,8 +113,14 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
                     model: (string) $config->get('whatsapp-cloud.media.openai.model', 'whisper-1'),
                     language: $config->get('whatsapp-cloud.media.openai.language'),
                 ),
+                'cloudflare' => new CloudflareAudioTranscriber(
+                    accountId: (string) $config->get('whatsapp-cloud.media.cloudflare.account_id'),
+                    token: (string) $config->get('whatsapp-cloud.media.cloudflare.token'),
+                    model: (string) $config->get('whatsapp-cloud.media.cloudflare.model', '@cf/openai/whisper-large-v3-turbo'),
+                    language: $config->get('whatsapp-cloud.media.cloudflare.language'),
+                ),
                 default => throw new InvalidArgumentException(
-                    "Unknown whatsapp-cloud transcriber [{$driver}]. Expected 'openai' or none — or bind your own AudioTranscriber.",
+                    "Unknown whatsapp-cloud transcriber [{$driver}]. Expected 'cloudflare', 'openai' or none — or bind your own AudioTranscriber.",
                 ),
             };
         });

@@ -14,8 +14,10 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
   the photo's size, the caption, "Recebi seu áudio"; a file over the limit is
   explained, not failed. Outside production the answer ends with a hint to bind
   your own handler (`WHATSAPP_CLOUD_MEDIA_HINT`). Texts in `whatsapp-cloud.media.replies`.
-- **Audio transcription.** `AudioTranscriber` contract, `WHATSAPP_CLOUD_TRANSCRIBER=openai`
-  for OpenAI's `/v1/audio/transcriptions` (`whisper-1`, `pt`); the default audio
+- **Audio transcription.** `AudioTranscriber` contract, `WHATSAPP_CLOUD_TRANSCRIBER=cloudflare`
+  for Workers AI (`@cf/openai/whisper-large-v3-turbo`, `CLOUDFLARE_ACCOUNT_ID` +
+  `CLOUDFLARE_AI_TOKEN`) or `openai` for OpenAI's `/v1/audio/transcriptions`
+  (`whisper-1`); both in `pt` by default. The default audio
   handler then answers what the audio said. Failures are logged and answered without
   the text.
 - **Audio in the sandbox.** 🎤 records a voice note in the browser and sends it as the
