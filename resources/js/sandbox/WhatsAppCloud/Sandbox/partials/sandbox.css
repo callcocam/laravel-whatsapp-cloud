@@ -327,6 +327,9 @@
 .wa-sandbox .b-body code { font-family: var(--mono); font-size: 12.5px; }
 .wa-sandbox .b-media { display: block; margin: -3px -5px 4px; }
 .wa-sandbox .b-media img { display: block; max-width: 100%; max-height: 280px; border-radius: 6px; }
+.wa-sandbox .b-audio { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.wa-sandbox .b-audio audio { height: 36px; max-width: 240px; }
+.wa-sandbox .btn.is-recording { color: #fff; background: #e53935; border-color: #e53935; }
 .wa-sandbox .b-doc {
     display: block;
     margin-bottom: 4px;

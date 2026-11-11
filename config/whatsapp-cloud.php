@@ -44,13 +44,62 @@ return [
     |--------------------------------------------------------------------------
     |
     | The largest file CloudApiClient::downloadMedia() accepts when the caller
-    | does not say otherwise. Meta lets people send documents up to 100 MB; an
-    | app rarely wants that much in memory.
+    | does not say otherwise (Meta lets people send documents up to 100 MB; an
+    | app rarely wants that much in memory), and what the package does with
+    | the media people send.
     |
     */
 
     'media' => [
         'max_download_bytes' => (int) env('WHATSAPP_CLOUD_MEDIA_MAX_DOWNLOAD_BYTES', 16 * 1024 * 1024),
+
+        /*
+        | Which received kinds the package hands to a handler. All off: the app
+        | listens to WhatsAppMessageReceived and does what it wants, as before.
+        |
+        | Turned on, a kind goes to InboundFileHandler (image, document) or
+        | InboundAudioHandler (audio). The package's defaults only ANSWER the
+        | person ("Recebi seu documento…"); bind your own handler to put the file
+        | to use in the app. Handlers run on the queue below.
+        */
+        'handle' => [
+            'image' => (bool) env('WHATSAPP_CLOUD_IMAGES_ENABLED', false),
+            'document' => (bool) env('WHATSAPP_CLOUD_DOCUMENTS_ENABLED', false),
+            'audio' => (bool) env('WHATSAPP_CLOUD_AUDIO_ENABLED', false),
+        ],
+
+        'queue_connection' => env('WHATSAPP_CLOUD_MEDIA_QUEUE_CONNECTION'),
+        'queue' => env('WHATSAPP_CLOUD_MEDIA_QUEUE'),
+
+        /*
+        | How the default audio handler reads an audio: none (it only says the
+        | audio arrived) or `openai`. Any other provider: bind your own
+        | AudioTranscriber.
+        */
+        'transcriber' => env('WHATSAPP_CLOUD_TRANSCRIBER'),
+
+        'openai' => [
+            'api_key' => env('OPENAI_API_KEY'),
+            'model' => env('WHATSAPP_CLOUD_TRANSCRIBE_MODEL', 'whisper-1'),
+            'language' => env('WHATSAPP_CLOUD_TRANSCRIBE_LANGUAGE', 'pt'),
+        ],
+
+        /*
+        | Whether the default answers end with the `hint` line telling the
+        | developer to bind their own handler. Null: everywhere but production.
+        */
+        'hint' => env('WHATSAPP_CLOUD_MEDIA_HINT'),
+
+        // What the default handlers answer. Placeholders start with a colon.
+        'replies' => [
+            'image' => 'Recebi sua imagem 🖼️ (:size).',
+            'document' => 'Recebi seu documento 📄 *:name* (:kind, :size).',
+            'caption' => 'Legenda: _:caption_',
+            'audio' => 'Recebi seu áudio 🎤',
+            'audio_transcribed' => "Recebi seu áudio 🎤\n\nVocê disse: \":text\"",
+            'too_large' => 'Recebi seu arquivo, mas ele passa do limite de :max e não consegui abrir.',
+            'hint' => 'ℹ️ Resposta padrão do laravel-whatsapp-cloud. Para usar este arquivo no app, implemente :contract.',
+        ],
     ],
 
     /*

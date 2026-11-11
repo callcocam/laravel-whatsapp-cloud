@@ -4,6 +4,30 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Added
+- **Handlers for received photos, documents and audio**, off by default and turned on
+  per kind (`WHATSAPP_CLOUD_IMAGES_ENABLED`, `WHATSAPP_CLOUD_DOCUMENTS_ENABLED`,
+  `WHATSAPP_CLOUD_AUDIO_ENABLED` → `whatsapp-cloud.media.handle`). A queued listener
+  (`HandleInboundMedia`, one try) hands each one to `InboundFileHandler` or
+  `InboundAudioHandler` as a `ReceivedMedia` (media, sender, `download()`, `reply()`).
+  The package's defaults only answer the person: the document's name, kind and size,
+  the photo's size, the caption, "Recebi seu áudio"; a file over the limit is
+  explained, not failed. Outside production the answer ends with a hint to bind
+  your own handler (`WHATSAPP_CLOUD_MEDIA_HINT`). Texts in `whatsapp-cloud.media.replies`.
+- **Audio transcription.** `AudioTranscriber` contract, `WHATSAPP_CLOUD_TRANSCRIBER=openai`
+  for OpenAI's `/v1/audio/transcriptions` (`whisper-1`, `pt`); the default audio
+  handler then answers what the audio said. Failures are logged and answered without
+  the text.
+- **Audio in the sandbox.** 🎤 records a voice note in the browser and sends it as the
+  contact (`type: audio`, `voice: true`); 📎 sends an audio file; the bubble plays it.
+  `InboundPayloadFactory::audio()`, `Sandbox::sendMedia(..., voice: true)` and a bundled
+  Ogg/Opus sample for downloads of ids nobody put.
+
+### Changed
+- `InboundMedia::fromMessage()` now reads `audio` too (with `voice` / `isVoiceNote()`),
+  where it returned null. Apps that took null as "not a photo or document" must check
+  the type.
+
 ## [0.6.1] - 2026-11-11
 
 ### Changed

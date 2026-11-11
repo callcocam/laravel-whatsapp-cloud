@@ -144,6 +144,62 @@ function sendFile(event) {
     })
 }
 
+/* ---------- recording a voice note as the contact ---------- */
+
+/* What the browser records (WebM or Ogg, both Opus) goes as a VOICE note, the
+ * shape WhatsApp sends when someone holds the mic: `type: audio`, `voice: true`.
+ * The app downloads these very bytes. */
+const recorder = ref(null)
+let chunks = []
+
+async function toggleRecording() {
+    if (recorder.value) {
+        recorder.value.stop()
+        return
+    }
+
+    let stream
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+        window.alert('O navegador não liberou o microfone. Use 📎 para enviar um arquivo de áudio.')
+        return
+    }
+
+    const type = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus'].find((t) => window.MediaRecorder?.isTypeSupported(t)) ?? ''
+    const media = new MediaRecorder(stream, type ? { mimeType: type } : undefined)
+    chunks = []
+
+    media.ondataavailable = (event) => event.data.size && chunks.push(event.data)
+    media.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop())
+        recorder.value = null
+
+        const mime = (media.mimeType || 'audio/webm').split(';')[0]
+        const blob = new Blob(chunks, { type: mime })
+        if (!blob.size) return
+
+        const replyTo = inspected.value?.direction === 'outbound' ? inspected.value.wamid : null
+
+        router.post(`${panelUrl.value}/media`, {
+            conversation: state.value.selected,
+            file: new File([blob], `voz.${mime.endsWith('ogg') ? 'ogg' : 'webm'}`, { type: mime }),
+            voice: true,
+            reply_to: replyTo,
+        }, {
+            forceFormData: true,
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: poll,
+        })
+    }
+
+    media.start()
+    recorder.value = media
+}
+
+onBeforeUnmount(() => recorder.value?.stop())
+
 /* ---------- sending a template as the system ---------- */
 
 const picked = ref(null)
@@ -385,9 +441,15 @@ const withDays = computed(() => {
                                 >
                                 <button
                                     class="btn"
-                                    title="Enviar foto ou arquivo como o contato (o texto digitado vira a legenda)"
+                                    title="Enviar foto, arquivo ou áudio como o contato (o texto digitado vira a legenda)"
                                     @click="fileInput?.click()"
                                 >📎</button>
+                                <button
+                                    class="btn"
+                                    :class="{ 'is-recording': recorder }"
+                                    :title="recorder ? 'Parar e enviar a nota de voz' : 'Gravar uma nota de voz como o contato'"
+                                    @click="toggleRecording"
+                                >{{ recorder ? '⏹' : '🎤' }}</button>
                             </template>
                             <textarea
                                 ref="composer"

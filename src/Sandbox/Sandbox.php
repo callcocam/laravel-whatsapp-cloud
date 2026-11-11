@@ -63,9 +63,10 @@ class Sandbox
 
     /**
      * The person sends a file: a photo (JPEG or PNG) comes back as `type: image`,
-     * anything else as `type: document`, exactly as Meta splits them. The bytes are
-     * put under the media id ({@see SandboxMediaDownloader::put()}), so when the app
-     * downloads what it received, it gets THIS file.
+     * an audio as `type: audio` (a voice note when `$voice`), anything else as
+     * `type: document`, exactly as Meta splits them. The bytes are put under the
+     * media id ({@see SandboxMediaDownloader::put()}), so when the app downloads
+     * what it received, it gets THIS file. Audio carries no caption on WhatsApp.
      */
     public function sendMedia(
         SandboxConversation $conversation,
@@ -74,9 +75,19 @@ class Sandbox
         string $filename,
         ?string $caption = null,
         ?string $replyTo = null,
+        bool $voice = false,
     ): SimulatedWebhook {
-        $isImage = in_array($mimeType, self::IMAGE_MIME_TYPES, true);
-        $mediaId = ($isImage ? 'media.SANDBOX.' : InboundPayloadFactory::DOCUMENT_MEDIA_PREFIX).Str::ulid();
+        $type = match (true) {
+            in_array($mimeType, self::IMAGE_MIME_TYPES, true) => 'image',
+            $voice || str_starts_with($mimeType, 'audio/') => 'audio',
+            default => 'document',
+        };
+
+        $mediaId = match ($type) {
+            'image' => 'media.SANDBOX.',
+            'audio' => InboundPayloadFactory::AUDIO_MEDIA_PREFIX,
+            default => InboundPayloadFactory::DOCUMENT_MEDIA_PREFIX,
+        }.Str::ulid();
 
         SandboxMediaDownloader::put($mediaId, $contents, $mimeType);
 
@@ -84,11 +95,13 @@ class Sandbox
 
         return $this->deliver(
             $conversation,
-            $isImage
-                ? $factory->image($caption, $replyTo, $mediaId, $mimeType)
-                : $factory->document($filename, $mimeType, $caption, $replyTo, $mediaId),
-            type: $isImage ? 'image' : 'document',
-            rendered: $caption ?? '',
+            match ($type) {
+                'image' => $factory->image($caption, $replyTo, $mediaId, $mimeType),
+                'audio' => $factory->audio($replyTo, $mediaId, $mimeType, $voice),
+                default => $factory->document($filename, $mimeType, $caption, $replyTo, $mediaId),
+            },
+            type: $type,
+            rendered: $type === 'audio' ? '' : ($caption ?? ''),
         );
     }
 

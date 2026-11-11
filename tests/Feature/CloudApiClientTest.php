@@ -304,7 +304,7 @@ it('fails the download with Meta error code', function () {
     expect(fn () => makeClient()->downloadMedia('media-gone'))->toThrow(CloudApiException::class);
 });
 
-it('reads the media part of an inbound image or document, and nothing else', function () {
+it('reads the media part of an inbound image, document or audio, and nothing else', function () {
     $document = InboundMedia::fromMessage(['type' => 'document', 'document' => [
         'id' => 'm-1', 'mime_type' => 'application/pdf', 'filename' => 'comprovante.pdf', 'caption' => 'depósito', 'sha256' => 'abc',
     ]]);
@@ -315,6 +315,8 @@ it('reads the media part of an inbound image or document, and nothing else', fun
         ->and($document->filename)->toBe('comprovante.pdf')
         ->and($document->caption)->toBe('depósito')
         ->and(InboundMedia::fromMessage(['type' => 'image', 'image' => ['id' => 'm-2', 'mime_type' => 'image/jpeg']])->type)->toBe('image')
-        ->and(InboundMedia::fromMessage(['type' => 'audio', 'audio' => ['id' => 'm-3']]))->toBeNull()
+        ->and(InboundMedia::fromMessage(['type' => 'audio', 'audio' => ['id' => 'm-3', 'mime_type' => 'audio/ogg; codecs=opus', 'voice' => true]])->isVoiceNote())->toBeTrue()
+        ->and(InboundMedia::fromMessage(['type' => 'audio', 'audio' => ['id' => 'm-4', 'mime_type' => 'audio/mpeg']])->isVoiceNote())->toBeFalse()
+        ->and(InboundMedia::fromMessage(['type' => 'sticker', 'sticker' => ['id' => 'm-5']]))->toBeNull()
         ->and(InboundMedia::fromMessage(['type' => 'text', 'text' => ['body' => 'oi']]))->toBeNull();
 });
