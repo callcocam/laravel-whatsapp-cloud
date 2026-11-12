@@ -13,6 +13,11 @@ use Throwable;
  * default), through its `/ai/run/{model}` endpoint: the audio goes base64 in
  * JSON, the text comes back in `result.text`.
  *
+ * `vad_filter` (on by default) drops the stretches without speech before
+ * transcribing: without it Whisper invents sentences out of noise or background
+ * talk ("Legenda Adriana Zanotto" from a beep), which an app may well repeat to
+ * the person.
+ *
  * Never throws: a failed transcription is logged and answered as null, so the
  * person still hears back that the audio arrived.
  */
@@ -23,6 +28,7 @@ class CloudflareAudioTranscriber implements AudioTranscriber
         private readonly string $token,
         private readonly string $model = '@cf/openai/whisper-large-v3-turbo',
         private readonly ?string $language = null,
+        private readonly bool $vadFilter = true,
         private readonly string $baseUrl = 'https://api.cloudflare.com/client/v4',
     ) {}
 
@@ -33,7 +39,7 @@ class CloudflareAudioTranscriber implements AudioTranscriber
         $payload = array_filter([
             'audio' => base64_encode($audio->contents),
             'language' => $this->language,
-        ], fn ($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '') + ['vad_filter' => $this->vadFilter];
 
         try {
             $response = Http::withToken($this->token)->timeout(60)->post($url, $payload);

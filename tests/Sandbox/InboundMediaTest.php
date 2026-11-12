@@ -124,7 +124,8 @@ it('transcribes with Cloudflare Workers AI', function () {
     Http::assertSent(fn ($request) => $request->url() === 'https://api.cloudflare.com/client/v4/accounts/acc-1/ai/run/@cf/openai/whisper-large-v3-turbo'
         && $request->hasHeader('Authorization', 'Bearer cf-test')
         && $request['audio'] === base64_encode('ogg-bytes')
-        && $request['language'] === 'pt');
+        && $request['language'] === 'pt'
+        && $request['vad_filter'] === true);
 });
 
 it('still answers when the Cloudflare transcription fails', function () {
