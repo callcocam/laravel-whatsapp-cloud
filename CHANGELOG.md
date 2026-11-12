@@ -4,6 +4,14 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Changed
+- **The sandbox page ships in TypeScript** (`<script setup lang="ts">`, `format.ts`,
+  `types.ts` with the shapes `/state` and `/messages/{id}` return), the way the Laravel
+  starter kits write their pages: publishing it no longer means porting it by hand to
+  pass the host's `vue-tsc` and ESLint. Same screen and behaviour. Hosts already holding
+  a published JS copy keep it until they publish again (`--tag=whatsapp-cloud-sandbox
+  --force`).
+
 ### Fixed
 - **Cloudflare transcription no longer invents text out of noise.** It sends
   `vad_filter: true` (`WHATSAPP_CLOUD_TRANSCRIBE_VAD`), so stretches without speech are
