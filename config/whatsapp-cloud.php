@@ -83,6 +83,9 @@ return [
             'token' => env('CLOUDFLARE_AI_TOKEN'),
             'model' => env('WHATSAPP_CLOUD_TRANSCRIBE_CLOUDFLARE_MODEL', '@cf/openai/whisper-large-v3-turbo'),
             'language' => env('WHATSAPP_CLOUD_TRANSCRIBE_LANGUAGE', 'pt'),
+            // Drop the stretches without speech first: without it Whisper invents
+            // sentences out of noise.
+            'vad_filter' => (bool) env('WHATSAPP_CLOUD_TRANSCRIBE_VAD', true),
         ],
 
         'openai' => [

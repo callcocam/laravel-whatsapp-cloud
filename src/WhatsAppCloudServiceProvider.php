@@ -118,6 +118,7 @@ class WhatsAppCloudServiceProvider extends ServiceProvider
                     token: (string) $config->get('whatsapp-cloud.media.cloudflare.token'),
                     model: (string) $config->get('whatsapp-cloud.media.cloudflare.model', '@cf/openai/whisper-large-v3-turbo'),
                     language: $config->get('whatsapp-cloud.media.cloudflare.language'),
+                    vadFilter: (bool) $config->get('whatsapp-cloud.media.cloudflare.vad_filter', true),
                 ),
                 default => throw new InvalidArgumentException(
                     "Unknown whatsapp-cloud transcriber [{$driver}]. Expected 'cloudflare', 'openai' or none — or bind your own AudioTranscriber.",

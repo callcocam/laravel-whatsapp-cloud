@@ -4,6 +4,11 @@ All notable changes to `callcocam/laravel-whatsapp-cloud` will be documented in 
 
 ## [Unreleased]
 
+### Fixed
+- **Cloudflare transcription no longer invents text out of noise.** It sends
+  `vad_filter: true` (`WHATSAPP_CLOUD_TRANSCRIBE_VAD`), so stretches without speech are
+  dropped before Whisper runs; a beep used to come back as "Legenda Adriana Zanotto".
+
 ### Added
 - **Handlers for received photos, documents and audio**, off by default and turned on
   per kind (`WHATSAPP_CLOUD_IMAGES_ENABLED`, `WHATSAPP_CLOUD_DOCUMENTS_ENABLED`,
