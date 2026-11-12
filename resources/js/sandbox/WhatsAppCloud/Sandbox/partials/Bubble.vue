@@ -1,33 +1,49 @@
-<script setup>
-import { computed } from 'vue'
-import { clockOf, formatWa, tickOf } from './format'
+<script setup lang="ts">
+import { computed } from 'vue';
+import { clockOf, formatWa, tickOf } from './format';
+import type { SandboxMessage, TapPayload, TemplateButton } from './types';
 
-const props = defineProps({
-    message: { type: Object, required: true },
-    selected: { type: Boolean, default: false },
-    panelUrl: { type: String, default: '' },
-})
+const props = withDefaults(
+    defineProps<{
+        message: SandboxMessage;
+        selected?: boolean;
+        panelUrl?: string;
+    }>(),
+    { selected: false, panelUrl: '' },
+);
 
-const emit = defineEmits(['tap', 'inspect'])
+const emit = defineEmits<{
+    tap: [payload: TapPayload];
+    inspect: [message: SandboxMessage];
+}>();
 
-const out = computed(() => props.message.direction === 'outbound')
+const out = computed(() => props.message.direction === 'outbound');
 
 /* URL and phone buttons open something on the device — Meta never tells you they
  * were pressed. Showing them as tappable would invent a webhook that does not
  * exist. */
 const buttons = computed(() =>
-    (props.message.template?.buttons ?? []).map((button) => ({
+    (props.message.template?.buttons ?? []).map((button: TemplateButton) => ({
         text: button.text,
         tappable: button.type === 'QUICK_REPLY',
-        hint: button.type === 'URL' ? '↗' : button.type === 'PHONE_NUMBER' ? '☎' : '',
+        hint:
+            button.type === 'URL'
+                ? '↗'
+                : button.type === 'PHONE_NUMBER'
+                  ? '☎'
+                  : '',
     })),
-)
+);
 
 /* The photo, file or audio the contact sent, served as the app's download gets it. */
-const mediaUrl = computed(() => props.message.media ? `${props.panelUrl}/messages/${props.message.id}/media` : null)
+const mediaUrl = computed(() =>
+    props.message.media
+        ? `${props.panelUrl}/messages/${props.message.id}/media`
+        : undefined,
+);
 
 /* Only a message WE sent can be replied to. */
-const canTap = computed(() => out.value && props.message.status !== 'failed')
+const canTap = computed(() => out.value && props.message.status !== 'failed');
 </script>
 
 <template>
@@ -37,9 +53,15 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
             :class="{ 'is-on': selected, failed: message.status === 'failed' }"
             @click="emit('inspect', message)"
         >
-            <span v-if="message.template" class="b-tag">Template · {{ message.template.name }}</span>
+            <span v-if="message.template" class="b-tag"
+                >Template · {{ message.template.name }}</span
+            >
 
-            <div v-if="message.template?.header" class="b-header" v-html="formatWa(message.template.header)" />
+            <div
+                v-if="message.template?.header"
+                class="b-header"
+                v-html="formatWa(message.template.header)"
+            />
 
             <a
                 v-if="message.media?.kind === 'image'"
@@ -47,7 +69,8 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
                 :href="mediaUrl"
                 target="_blank"
                 @click.stop
-            ><img :src="mediaUrl" alt=""></a>
+                ><img :src="mediaUrl" alt=""
+            /></a>
             <div
                 v-else-if="message.media?.kind === 'audio'"
                 class="b-audio"
@@ -62,11 +85,18 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
                 :href="mediaUrl"
                 target="_blank"
                 @click.stop
-            >📄 {{ message.media.filename || message.media.mime_type }}</a>
+                >📄 {{ message.media.filename || message.media.mime_type }}</a
+            >
 
-            <div v-if="message.text || !message.media" class="b-body" v-html="formatWa(message.text)" />
+            <div
+                v-if="message.text || !message.media"
+                class="b-body"
+                v-html="formatWa(message.text)"
+            />
 
-            <div v-if="message.template?.footer" class="b-footer">{{ message.template.footer }}</div>
+            <div v-if="message.template?.footer" class="b-footer">
+                {{ message.template.footer }}
+            </div>
 
             <!-- Tapping fires the webhook Meta would fire — and each shape is a
                  DIFFERENT webhook: a template button comes back as type:button, an
@@ -78,35 +108,68 @@ const canTap = computed(() => out.value && props.message.status !== 'failed')
                     :key="button.text"
                     class="bb"
                     :disabled="!button.tappable || !canTap"
-                    :title="button.tappable ? 'Responder como o contato' : 'Meta não avisa quando este botão é tocado'"
-                    @click="emit('tap', { kind: 'template', text: button.text, reply_to: message.wamid })"
+                    :title="
+                        button.tappable
+                            ? 'Responder como o contato'
+                            : 'Meta não avisa quando este botão é tocado'
+                    "
+                    @click="
+                        emit('tap', {
+                            kind: 'template',
+                            text: button.text,
+                            reply_to: message.wamid,
+                        })
+                    "
                 >
                     {{ button.hint }} {{ button.text }}
                 </button>
             </div>
 
-            <div v-if="message.options?.length" class="bubble-buttons" @click.stop>
+            <div
+                v-if="message.options?.length"
+                class="bubble-buttons"
+                @click.stop
+            >
                 <button
                     v-for="option in message.options"
                     :key="option.id"
                     class="bb"
                     :disabled="!canTap"
-                    @click="emit('tap', { kind: option.kind, id: option.id, text: option.title, reply_to: message.wamid })"
+                    @click="
+                        emit('tap', {
+                            kind: option.kind,
+                            id: option.id,
+                            text: option.title,
+                            reply_to: message.wamid,
+                        })
+                    "
                 >
                     {{ option.title }}
                 </button>
             </div>
 
-            <div v-for="warning in message.warnings" :key="warning" class="b-warn">⚠ {{ warning }}</div>
+            <div
+                v-for="warning in message.warnings"
+                :key="warning"
+                class="b-warn"
+            >
+                ⚠ {{ warning }}
+            </div>
 
             <div class="b-meta">
                 <span>{{ clockOf(message.at) }}</span>
                 <span
                     v-if="out"
                     class="b-tick"
-                    :class="{ read: message.status === 'read', failed: message.status === 'failed' }"
-                >{{ tickOf(message.status) }}</span>
-                <span v-if="message.error_code" class="b-tick failed">{{ message.error_code }}</span>
+                    :class="{
+                        read: message.status === 'read',
+                        failed: message.status === 'failed',
+                    }"
+                    >{{ tickOf(message.status) }}</span
+                >
+                <span v-if="message.error_code" class="b-tick failed">{{
+                    message.error_code
+                }}</span>
             </div>
         </div>
     </div>
