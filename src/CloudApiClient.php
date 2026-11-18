@@ -14,6 +14,7 @@ use Callcocam\WhatsAppCloud\Messages\SendResult;
 use Callcocam\WhatsAppCloud\Messages\TemplateMessage;
 use Callcocam\WhatsAppCloud\Support\ArrayCredentials;
 use Callcocam\WhatsAppCloud\Templates\TemplateRegistry;
+use InvalidArgumentException;
 
 /**
  * The official (Meta Cloud API) provider — the only WhatsApp channel. It speaks
@@ -184,6 +185,88 @@ class CloudApiClient implements MessageGateway
                     'sections' => [['rows' => $rows]],
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * Reply buttons with the app's own ids (Meta echoes the tapped id in
+     * `button_reply.id`), optionally under an image header — e.g. a picture
+     * with "Approve" / "Change" right below it. At most 3 buttons; titles are
+     * capped at 20 chars and ids at 256.
+     *
+     * @param  array<string, string>  $buttons  id => title
+     */
+    public function sendButtons(string $to, string $body, array $buttons, ?string $imageUrl = null, ?string $footer = null): SendResult
+    {
+        if ($buttons === [] || count($buttons) > self::MAX_REPLY_BUTTONS) {
+            throw new InvalidArgumentException('Reply buttons take 1 to '.self::MAX_REPLY_BUTTONS.' buttons.');
+        }
+
+        $rows = [];
+        foreach ($buttons as $id => $title) {
+            $rows[] = ['type' => 'reply', 'reply' => ['id' => mb_substr((string) $id, 0, 256), 'title' => mb_substr($title, 0, self::MAX_BUTTON_TITLE)]];
+        }
+
+        return $this->send($to, [
+            'type' => 'interactive',
+            'interactive' => array_filter([
+                'type' => 'button',
+                'header' => $imageUrl !== null ? ['type' => 'image', 'image' => ['link' => $imageUrl]] : null,
+                'body' => ['text' => mb_substr($body, 0, 1024)],
+                'footer' => $footer !== null ? ['text' => mb_substr($footer, 0, 60)] : null,
+                'action' => ['buttons' => $rows],
+            ]),
+        ]);
+    }
+
+    /**
+     * An interactive list with the app's own row ids (Meta echoes the picked id
+     * in `list_reply.id`) and an optional description per row. At most 10 rows;
+     * titles are capped at 24 chars, descriptions at 72, ids at 200.
+     *
+     * @param  array<string, string|array{0: string, 1?: string|null}>  $rows  id => title, or id => [title, description]
+     */
+    public function sendList(string $to, string $body, string $buttonLabel, array $rows, ?string $sectionTitle = null): SendResult
+    {
+        if ($rows === [] || count($rows) > 10) {
+            throw new InvalidArgumentException('A list takes 1 to 10 rows.');
+        }
+
+        $listRows = [];
+        foreach ($rows as $id => $row) {
+            [$title, $description] = is_array($row) ? [$row[0], $row[1] ?? null] : [$row, null];
+            $listRows[] = array_filter([
+                'id' => mb_substr((string) $id, 0, 200),
+                'title' => mb_substr($title, 0, 24),
+                'description' => $description !== null && $description !== '' ? mb_substr($description, 0, 72) : null,
+            ]);
+        }
+
+        return $this->send($to, [
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'list',
+                'body' => ['text' => mb_substr($body, 0, 1024)],
+                'action' => [
+                    'button' => mb_substr($buttonLabel, 0, 20),
+                    'sections' => [array_filter([
+                        'title' => $sectionTitle !== null ? mb_substr($sectionTitle, 0, 24) : null,
+                        'rows' => $listRows,
+                    ])],
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * An image by public link, with an optional caption (inside the 24h
+     * session window, like any free-form message).
+     */
+    public function sendImage(string $to, string $imageUrl, ?string $caption = null): SendResult
+    {
+        return $this->send($to, [
+            'type' => 'image',
+            'image' => array_filter(['link' => $imageUrl, 'caption' => $caption !== null ? mb_substr($caption, 0, 1024) : null]),
         ]);
     }
 

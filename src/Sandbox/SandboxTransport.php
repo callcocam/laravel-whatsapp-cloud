@@ -134,6 +134,7 @@ class SandboxTransport implements MessageTransport
         return match ($type) {
             'text' => (string) data_get($envelope, 'text.body'),
             'interactive' => (string) data_get($envelope, 'interactive.body.text'),
+            'image' => trim('🖼️ '.(string) data_get($envelope, 'image.caption')),
             'template' => $this->attachment($envelope).($template?->render($this->params($envelope))
                 // No definition file and Meta could not be reached: show what we
                 // do know rather than an empty bubble.
