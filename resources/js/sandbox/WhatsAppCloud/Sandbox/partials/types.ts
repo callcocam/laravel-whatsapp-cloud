@@ -55,6 +55,8 @@ export interface SandboxMessage {
     template?: MessageTemplate | null;
     options?: MessageOption[];
     media?: MessageMedia | null;
+    /** A picture the app sent by link (image message or interactive image header). */
+    image_url?: string | null;
 }
 
 export interface SandboxConversation {

@@ -391,6 +391,12 @@ class SandboxController
             // A photo or file the contact sent: what to draw in the bubble.
             'media' => $this->mediaOf($message),
 
+            // A picture the app sent by link: an image message, or the image header
+            // above interactive buttons.
+            'image_url' => $message->direction === SandboxMessage::OUTBOUND
+                ? (data_get($message->envelope, 'image.link') ?? data_get($message->envelope, 'interactive.header.image.link'))
+                : null,
+
             'template' => $template === null ? null : [
                 'name' => $message->template_name,
                 'header' => $template->headerText(),

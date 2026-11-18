@@ -64,7 +64,15 @@ const canTap = computed(() => out.value && props.message.status !== 'failed');
             />
 
             <a
-                v-if="message.media?.kind === 'image'"
+                v-if="message.image_url"
+                class="b-media"
+                :href="message.image_url"
+                target="_blank"
+                @click.stop
+                ><img :src="message.image_url" alt=""
+            /></a>
+            <a
+                v-else-if="message.media?.kind === 'image'"
                 class="b-media"
                 :href="mediaUrl"
                 target="_blank"

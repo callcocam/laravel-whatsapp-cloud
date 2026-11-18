@@ -287,9 +287,18 @@ const template = computed(
     () => state.value.templates.find((t) => t.name === picked.value) ?? null,
 );
 
-watch(template, (value) => {
-    params.value = Array.from({ length: value?.variables ?? 0 }, () => '');
-});
+// Keyed on the name + variable count, not the object: the poll replaces
+// `state` every 1.5s with fresh template objects, which would wipe what the
+// developer is typing.
+watch(
+    () => [picked.value, template.value?.variables ?? 0] as const,
+    ([name, variables], previous) => {
+        if (previous && previous[0] === name && previous[1] === variables) {
+            return;
+        }
+        params.value = Array.from({ length: variables }, () => '');
+    },
+);
 
 function fire(): void {
     if (!picked.value) {
