@@ -2,6 +2,7 @@
 
 namespace Callcocam\WhatsAppCloud\Http\Controllers;
 
+use Callcocam\WhatsAppCloud\Events\WhatsAppAccountUpdated;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Events\WhatsAppStatusReceived;
 use Callcocam\WhatsAppCloud\Events\WhatsAppWebhookVerified;
@@ -13,12 +14,14 @@ use Illuminate\Http\Response;
  * Webhook for the official Meta Cloud API. Two entry points:
  *  - verify() (GET): the one-time hub-challenge handshake Meta performs when the
  *    callback URL is registered.
- *  - store() (POST): inbound messages and delivery statuses, authenticated by
- *    the X-Hub-Signature-256 HMAC (app secret) over the raw body.
+ *  - store() (POST): inbound messages, delivery statuses and account updates
+ *    (quality, limits, restrictions), authenticated by the
+ *    X-Hub-Signature-256 HMAC (app secret) over the raw body.
  *
  * The controller only authenticates, parses and dispatches events. It carries no
  * business logic — the app listens to {@see WhatsAppMessageReceived} /
- * {@see WhatsAppStatusReceived} and decides what to do.
+ * {@see WhatsAppStatusReceived} / {@see WhatsAppAccountUpdated} and decides
+ * what to do.
  */
 class WebhookController
 {
@@ -69,6 +72,10 @@ class WebhookController
             }
         }
 
+        foreach ($this->accountUpdates($request->all()) as [$field, $value, $wabaId]) {
+            WhatsAppAccountUpdated::dispatch($field, $value, $wabaId);
+        }
+
         return response()->json(['handled' => true]);
     }
 
@@ -91,6 +98,33 @@ class WebhookController
         }
 
         return $values;
+    }
+
+    /**
+     * Every change that is not about messages (quality, limits, account
+     * restrictions…), with the account id of its entry.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array{0: string, 1: array<string, mixed>, 2: string|null}>
+     */
+    protected function accountUpdates(array $payload): array
+    {
+        $updates = [];
+
+        foreach (data_get($payload, 'entry', []) as $entry) {
+            $wabaId = data_get($entry, 'id');
+            $wabaId = is_scalar($wabaId) ? (string) $wabaId : null;
+
+            foreach (data_get($entry, 'changes', []) as $change) {
+                $field = data_get($change, 'field');
+
+                if (is_string($field) && $field !== 'messages' && is_array($value = data_get($change, 'value'))) {
+                    $updates[] = [$field, $value, $wabaId];
+                }
+            }
+        }
+
+        return $updates;
     }
 
     /**

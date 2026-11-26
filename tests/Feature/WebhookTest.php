@@ -1,5 +1,6 @@
 <?php
 
+use Callcocam\WhatsAppCloud\Events\WhatsAppAccountUpdated;
 use Callcocam\WhatsAppCloud\Events\WhatsAppMessageReceived;
 use Callcocam\WhatsAppCloud\Events\WhatsAppStatusReceived;
 use Callcocam\WhatsAppCloud\Events\WhatsAppWebhookVerified;
@@ -96,4 +97,34 @@ it('rejects a payload with no signature header', function () {
     postWebhook([
         'entry' => [['changes' => [['field' => 'messages', 'value' => ['messages' => []]]]]],
     ], secret: null)->assertForbidden();
+});
+
+it('dispatches an account event for quality and account updates, with the account id', function () {
+    Event::fake([WhatsAppAccountUpdated::class, WhatsAppMessageReceived::class]);
+
+    postWebhook([
+        'entry' => [[
+            'id' => '102290129340398',
+            'changes' => [
+                [
+                    'field' => 'phone_number_quality_update',
+                    'value' => ['display_phone_number' => '+55 51 8211-2602', 'event' => 'FLAGGED', 'current_limit' => 'TIER_1K'],
+                ],
+                [
+                    'field' => 'account_update',
+                    'value' => ['event' => 'ACCOUNT_VIOLATION', 'violation_info' => ['violation_type' => 'SCAM']],
+                ],
+            ],
+        ]],
+    ])->assertOk();
+
+    Event::assertDispatchedTimes(WhatsAppAccountUpdated::class, 2);
+    Event::assertDispatched(WhatsAppAccountUpdated::class, fn ($e) => $e->field === 'phone_number_quality_update'
+        && $e->wabaId === '102290129340398'
+        && $e->event() === 'FLAGGED'
+        && $e->displayPhoneNumber() === '555182112602');
+    Event::assertDispatched(WhatsAppAccountUpdated::class, fn ($e) => $e->field === 'account_update'
+        && $e->event() === 'ACCOUNT_VIOLATION'
+        && $e->displayPhoneNumber() === null);
+    Event::assertNotDispatched(WhatsAppMessageReceived::class);
 });
