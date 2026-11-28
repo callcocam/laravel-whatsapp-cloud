@@ -271,6 +271,56 @@ class CloudApiClient implements MessageGateway
     }
 
     /**
+     * How Meta sees a file: image, video, audio or document. Meta only takes
+     * some formats (and sizes) as each kind; the rest goes as a document,
+     * which accepts anything up to 100 MB.
+     *
+     * @return 'image'|'video'|'audio'|'document'
+     */
+    public static function mediaTypeFor(string $mimeType, int $size = 0): string
+    {
+        $mimeType = strtolower(trim(explode(';', $mimeType)[0]));
+
+        $kinds = [
+            'image' => [['image/jpeg', 'image/png'], 5 * 1024 * 1024],
+            'video' => [['video/mp4', 'video/3gpp'], 16 * 1024 * 1024],
+            'audio' => [['audio/aac', 'audio/mp4', 'audio/mpeg', 'audio/amr', 'audio/ogg'], 16 * 1024 * 1024],
+        ];
+
+        foreach ($kinds as $type => [$mimes, $limit]) {
+            if (in_array($mimeType, $mimes, true) && $size <= $limit) {
+                return $type;
+            }
+        }
+
+        return 'document';
+    }
+
+    /**
+     * Send a file the app holds: uploads it to Meta and sends it as the kind
+     * {@see mediaTypeFor()} picks (inside the 24h session window). The caption
+     * only exists for image, video and document; the file name only shows on
+     * a document.
+     */
+    public function sendFile(string $to, string $contents, string $mimeType, string $filename, ?string $caption = null): SendResult
+    {
+        $type = self::mediaTypeFor($mimeType, strlen($contents));
+        $mediaId = $this->uploadMedia($contents, $mimeType, $filename);
+
+        $media = ['id' => $mediaId];
+
+        if ($type !== 'audio' && $caption !== null && $caption !== '') {
+            $media['caption'] = mb_substr($caption, 0, 1024);
+        }
+
+        if ($type === 'document') {
+            $media['filename'] = mb_substr($filename, 0, 240);
+        }
+
+        return $this->send($to, ['type' => $type, $type => $media]);
+    }
+
+    /**
      * @param  list<string>  $options
      */
     private function fitsReplyButtons(array $options): bool
